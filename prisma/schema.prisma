@@ -1,0 +1,485 @@
+// LeadMind AI — Prisma schema
+// SQLite for local/sandbox development (PostgreSQL-compatible field choices)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────── Identity & tenancy ───────────────────────────
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships     Membership[]
+  companies       Company[]
+  leads           Lead[]
+  icpConfigs      IcpConfig[]
+  intentConfigs   IntentConfig[]
+  settings        Setting[]
+  conversations   Conversation[]
+  memories        ChatMemory[]
+  knowledgeDocs   KnowledgeDocument[]
+  agentRuns       AgentRun[]
+  driftReports    DriftReport[]
+  auditLogs       AuditLog[]
+  feedbacks       Feedback[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sessions    Session[]
+  memberships Membership[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Membership {
+  id          String   @id @default(cuid())
+  userId      String
+  workspaceId String
+  role        String // ADMIN | MEMBER | VIEWER
+  createdAt   DateTime @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId])
+  @@index([workspaceId])
+}
+
+// ─────────────────────────── Core CRM data ───────────────────────────
+
+model Company {
+  id            String   @id @default(cuid())
+  workspaceId   String
+  name          String
+  industry      String?
+  employeeCount Int?
+  revenueBand   String? // UNKNOWN | <1M | 1M-10M | 10M-50M | 50M-100M | 100M+
+  country       String?
+  businessModel String? // B2B_SAAS | B2C | MARKETPLACE | ENTERPRISE | AGENCY | OTHER
+  website       String?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  leads     Lead[]
+
+  @@index([workspaceId])
+  @@index([workspaceId, industry])
+}
+
+model Lead {
+  id          String   @id @default(cuid())
+  workspaceId String
+  companyId   String?
+  contactName String
+  email       String?
+  phone       String?
+  title       String?
+  status      String   @default("ACTIVE") // NEW | ACTIVE | NURTURING | QUALIFIED | WON | LOST | UNQUALIFIED
+  source      String? // WEBSITE | REFERRAL | OUTBOUND | EVENT | IMPORT | MANUAL | PARTNER
+  dealValue   Float?
+  ownerId     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace       Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  company         Company?          @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  events          LeadEvent[]
+  assessments     Assessment[]
+  qualifications  Qualification[]
+  recommendations Recommendation[]
+  memories        ChatMemory[]
+  feedbacks       Feedback[]
+  outcomes        VerifiedOutcome[]
+
+  @@index([workspaceId])
+  @@index([workspaceId, status])
+  @@index([workspaceId, createdAt])
+}
+
+model LeadEvent {
+  id          String   @id @default(cuid())
+  leadId      String
+  workspaceId String
+  type        String // WEBSITE_VISIT | PRICING_VISIT | PRODUCT_VISIT | DEMO_REQUEST | EMAIL_OPEN | EMAIL_CLICK | SOCIAL_ENGAGEMENT | FORM_SUBMIT | NEGATIVE_FEEDBACK | UNSUBSCRIBE | NOTE | CONTACTED | MEETING | MANUAL
+  source      String? // WEB | EMAIL | CRM | IMPORT | MANUAL
+  weight      Float? // manual override of configured weight
+  occurredAt  DateTime
+  dedupeKey   String?
+  metadata    String? // JSON
+  createdAt   DateTime @default(now())
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId, occurredAt])
+  @@index([workspaceId, type])
+}
+
+// ─────────────────────────── Scoring configuration ───────────────────────────
+
+model IcpConfig {
+  id          String   @id @default(cuid())
+  workspaceId String
+  version     Int
+  config      String // JSON IcpConfigData
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, version])
+}
+
+model IntentConfig {
+  id          String   @id @default(cuid())
+  workspaceId String
+  version     Int
+  config      String // JSON IntentConfigData
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, version])
+}
+
+model Setting {
+  id          String   @id @default(cuid())
+  workspaceId String
+  key         String // qualification_thresholds | product_info | chatbot_config | ...
+  value       String // JSON
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, key])
+}
+
+// ─────────────────────────── Intelligence outputs ───────────────────────────
+
+model Assessment {
+  id          String   @id @default(cuid())
+  leadId      String
+  workspaceId String
+  kind        String // FIT | INTENT | PREDICTION | QUALIFICATION
+  score       Float?
+  version     String // config or model version used
+  payload     String // JSON: factors, explanation, contributions, warnings
+  contentHash String // canonical input hash for cache invalidation
+  createdAt   DateTime @default(now())
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId, kind, createdAt])
+  @@index([workspaceId, kind])
+}
+
+model Qualification {
+  id             String   @id @default(cuid())
+  leadId         String
+  workspaceId    String
+  category       String // SALES_READY | NURTURE_TRACK | KEEP_WARM | MANUAL_REVIEW
+  reasons        String // JSON array of explanation strings
+  source         String   @default("AUTO") // AUTO | MANUAL
+  overriddenById String?
+  overrideReason String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId, isActive])
+  @@index([workspaceId, category, isActive])
+}
+
+model Recommendation {
+  id              String   @id @default(cuid())
+  leadId          String
+  workspaceId     String
+  action          String // CONTACT_NOW | SCHEDULE_DEMO | SEND_CONTENT | NURTURE | REQUEST_INFO | REASSESS_FIT | MONITOR | RE_ENGAGE
+  priority        String // CRITICAL | HIGH | MEDIUM | LOW
+  explanation     String
+  evidence        String // JSON array
+  signals         String // JSON array
+  status          String   @default("PENDING") // PENDING | ACCEPTED | COMPLETED | DISMISSED
+  suggestedTiming String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId, status])
+  @@index([workspaceId, status])
+}
+
+// ─────────────────────────── ML / models ───────────────────────────
+
+model ModelVersion {
+  id           String   @id @default(cuid())
+  workspaceId  String?
+  name         String
+  algorithm    String // LOGISTIC_REGRESSION | RANDOM_FOREST | GRADIENT_BOOSTING
+  versionTag   String
+  status       String   @default("READY") // READY | PRODUCTION | ARCHIVED | FAILED
+  params       String // JSON
+  features     String // JSON feature names
+  artifacts    String // JSON serialized model (weights / trees / standardizer / threshold / calibration)
+  trainInfo    String // JSON (rows, splits, synthetic flag)
+  evalMetrics  String // JSON test metrics
+  isProduction Boolean  @default(false)
+  trainedAt    DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  evaluations ModelEvaluation[]
+  driftReports DriftReport[]
+
+  @@index([workspaceId, isProduction])
+}
+
+model ModelEvaluation {
+  id             String   @id @default(cuid())
+  modelVersionId String
+  split          String // TEST | VALIDATION
+  metrics        String // JSON
+  confusion      String // JSON
+  calibration    String // JSON bins
+  createdAt      DateTime @default(now())
+
+  modelVersion ModelVersion @relation(fields: [modelVersionId], references: [id], onDelete: Cascade)
+
+  @@index([modelVersionId])
+}
+
+model DriftReport {
+  id             String   @id @default(cuid())
+  workspaceId    String
+  modelVersionId String?
+  status         String // STABLE | WARNING | ALERT
+  psi            String // JSON per-feature PSI
+  details        String // JSON
+  createdAt      DateTime @default(now())
+
+  workspace    Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  modelVersion ModelVersion? @relation(fields: [modelVersionId], references: [id])
+
+  @@index([workspaceId, createdAt])
+}
+
+// ─────────────────────────── Agent orchestration ───────────────────────────
+
+model AgentRun {
+  id          String   @id @default(cuid())
+  workspaceId String
+  kind        String // ANALYTICAL | CONVERSATIONAL
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  trigger     String?
+  status      String   @default("RUNNING") // RUNNING | SUCCESS | FAILED
+  steps       String // JSON trace
+  startedAt   DateTime @default(now())
+  createdAt   DateTime @default(now())
+  finishedAt  DateTime?
+  durationMs  Int?
+
+  @@index([workspaceId, startedAt])
+}
+
+model ToolExecution {
+  id             String   @id @default(cuid())
+  runId          String?
+  conversationId String?
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  name           String
+  args           String
+  result         String // JSON
+  status         String // OK | ERROR | DENIED
+  durationMs     Int
+  createdAt      DateTime @default(now())
+
+  @@index([conversationId])
+}
+
+// ─────────────────────────── Conversational AI ───────────────────────────
+
+model Conversation {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  title       String   @default("New conversation")
+  mode        String   @default("LLM") // LLM | DEMO
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  messages       Message[]
+  pendingActions PendingAction[]
+  toolExecutions ToolExecution[]
+
+  @@index([workspaceId, updatedAt])
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  role           String // USER | ASSISTANT
+  content        String
+  toolTraces     String? // JSON array of tool executions (summarized for UI)
+  model          String? // provider/model id or "demo-assistant"
+  tokensIn       Int?
+  tokensOut      Int?
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+}
+
+model PendingAction {
+  id             String   @id @default(cuid())
+  conversationId String
+  workspaceId    String
+  toolName       String
+  args           String
+  summary        String
+  status         String   @default("PENDING") // PENDING | CONFIRMED | CANCELLED
+  createdAt      DateTime @default(now())
+  executedAt     DateTime?
+  result         String?
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, status])
+}
+
+model ChatMemory {
+  id          String   @id @default(cuid())
+  workspaceId String
+  scope       String // WORKSPACE | LEAD | USER
+  leadId      String?
+  key         String
+  value       String
+  source      String   @default("CONVERSATION") // CONVERSATION | MANUAL | SYSTEM
+  approved    Boolean  @default(false)
+  confidence  Float?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  lead      Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, scope, approved])
+}
+
+// ─────────────────────────── Knowledge base (RAG) ───────────────────────────
+
+model KnowledgeDocument {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  name         String
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  kind         String   @default("OTHER") // PLAYBOOK | POLICY | PRODUCT | OTHER
+  mimeType     String?
+  sizeBytes    Int      @default(0)
+  status       String   @default("READY") // READY | FAILED
+  chunkCount   Int      @default(0)
+  text         String?
+  error        String?
+  uploadedById String?
+  createdAt    DateTime @default(now())
+
+  chunks DocumentChunk[]
+
+  @@index([workspaceId])
+}
+
+model DocumentChunk {
+  id          String   @id @default(cuid())
+  documentId  String
+  workspaceId String
+  ordinal     Int
+  text        String
+  createdAt   DateTime @default(now())
+
+  document KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+}
+
+// ─────────────────────────── Feedback & outcomes ───────────────────────────
+
+model Feedback {
+  id              String   @id @default(cuid())
+  workspaceId     String
+  leadId          String?
+  recommendationId String?
+  kind            String // RECOMMENDATION_RATING | SCORE_DISAGREEMENT | GENERAL
+  rating          Int? // 1..5
+  comment         String?
+  payload         String? // JSON
+  createdById     String?
+  createdAt       DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  lead      Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+}
+
+model VerifiedOutcome {
+  id          String   @id @default(cuid())
+  leadId      String
+  workspaceId String
+  outcome     String // WON | LOST | OPEN
+  dealValue   Float?
+  notes       String?
+  occurredAt  DateTime
+  source      String   @default("MANUAL") // MANUAL | IMPORT
+  isTrainingExcluded Boolean @default(false)
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, outcome])
+}
+
+// ─────────────────────────── Audit ───────────────────────────
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  workspaceId String?
+  userId      String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id])
+  action      String
+  detail      String? // JSON
+  createdAt   DateTime @default(now())
+
+  @@index([workspaceId, createdAt])
+}
