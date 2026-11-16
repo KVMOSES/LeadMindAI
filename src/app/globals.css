@@ -43,73 +43,107 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/* ── LeadMind AI design tokens ──────────────────────────────────────────────
+   Dark-first. Midnight charcoal base, graphite surfaces, restrained electric
+   violet brand accent, subtle blue secondary, emerald/amber/rose reserved
+   for semantic success / warning / critical states.                          */
+
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+
+  /* Light theme */
+  --background: oklch(0.978 0.002 270);
+  --foreground: oklch(0.21 0.02 265);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.21 0.02 265);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.596 0.145 163.225);
+  --popover-foreground: oklch(0.21 0.02 265);
+  --primary: oklch(0.545 0.19 288);
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.955 0.004 270);
+  --secondary-foreground: oklch(0.28 0.02 265);
+  --muted: oklch(0.955 0.004 270);
+  --muted-foreground: oklch(0.5 0.015 265);
+  --accent: oklch(0.952 0.014 288);
+  --accent-foreground: oklch(0.42 0.14 288);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.596 0.145 163.225);
-  --chart-1: oklch(0.596 0.145 163.225);
-  --chart-2: oklch(0.769 0.188 70.08);
-  --chart-3: oklch(0.645 0.246 16.439);
-  --chart-4: oklch(0.6 0.118 184.704);
+  --border: oklch(0.912 0.006 270);
+  --input: oklch(0.9 0.006 270);
+  --ring: oklch(0.545 0.19 288 / 45%);
+  --chart-1: oklch(0.545 0.19 288);
+  --chart-2: oklch(0.6 0.13 250);
+  --chart-3: oklch(0.596 0.145 163.225);
+  --chart-4: oklch(0.769 0.188 70.08);
   --chart-5: oklch(0.556 0 0);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.596 0.145 163.225);
+  --sidebar: oklch(0.145 0.012 265);
+  --sidebar-foreground: oklch(0.92 0.006 270);
+  --sidebar-primary: oklch(0.665 0.16 288);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar-accent: oklch(1 0 0 / 6%);
+  --sidebar-accent-foreground: oklch(0.95 0.005 270);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: oklch(0.545 0.19 288 / 50%);
+
+  /* LeadMind brand layer (light) */
+  --lm-sidebar: oklch(0.155 0.014 265);
+  --lm-sidebar-hover: oklch(1 0 0 / 6%);
+  --lm-brand: oklch(0.545 0.19 288);           /* electric violet */
+  --lm-brand-soft: oklch(0.545 0.19 288 / 0.12);
+  --lm-info: oklch(0.6 0.13 250);              /* subtle blue */
+  --lm-info-soft: oklch(0.6 0.13 250 / 0.12);
+  --lm-success: oklch(0.596 0.145 163.225);    /* emerald — positive states only */
+  --lm-warning: oklch(0.666 0.179 58);         /* amber */
+  --lm-danger: oklch(0.645 0.246 16.439);      /* rose */
+  --lm-elevated: oklch(1 0 0);
+  --lm-hairline: oklch(0.21 0.02 265 / 10%);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.596 0.145 163.225);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  /* Deep midnight charcoal — the primary LeadMind experience */
+  --background: oklch(0.168 0.014 265);
+  --foreground: oklch(0.955 0.006 265);
+  --card: oklch(0.205 0.016 265);
+  --card-foreground: oklch(0.955 0.006 265);
+  --popover: oklch(0.215 0.017 265);
+  --popover-foreground: oklch(0.955 0.006 265);
+  --primary: oklch(0.68 0.155 288);
+  --primary-foreground: oklch(0.16 0.03 288);
+  --secondary: oklch(0.245 0.016 265);
+  --secondary-foreground: oklch(0.93 0.006 265);
+  --muted: oklch(0.235 0.016 265);
+  --muted-foreground: oklch(0.68 0.015 265);
+  --accent: oklch(0.245 0.03 288);
+  --accent-foreground: oklch(0.85 0.09 288);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.68 0.155 288 / 50%);
+  --chart-1: oklch(0.68 0.155 288);
+  --chart-2: oklch(0.68 0.12 250);
+  --chart-3: oklch(0.696 0.17 162.48);
+  --chart-4: oklch(0.79 0.15 70.08);
+  --chart-5: oklch(0.556 0 0);
+  --sidebar: oklch(0.138 0.014 265);
+  --sidebar-foreground: oklch(0.92 0.008 265);
+  --sidebar-primary: oklch(0.72 0.15 288);
+  --sidebar-primary-foreground: oklch(0.16 0.03 288);
+  --sidebar-accent: oklch(1 0 0 / 7%);
+  --sidebar-accent-foreground: oklch(0.95 0.006 265);
+  --sidebar-border: oklch(1 0 0 / 7%);
+  --sidebar-ring: oklch(0.68 0.155 288 / 50%);
+
+  /* LeadMind brand layer (dark) */
+  --lm-sidebar: oklch(0.128 0.014 265);
+  --lm-sidebar-hover: oklch(1 0 0 / 5%);
+  --lm-brand: oklch(0.72 0.15 288);            /* restrained electric violet */
+  --lm-brand-soft: oklch(0.72 0.15 288 / 0.13);
+  --lm-info: oklch(0.72 0.11 250);             /* subtle blue */
+  --lm-info-soft: oklch(0.72 0.11 250 / 0.12);
+  --lm-success: oklch(0.72 0.15 162);
+  --lm-warning: oklch(0.79 0.15 70);
+  --lm-danger: oklch(0.71 0.19 22);
+  --lm-elevated: oklch(0.235 0.017 265);
+  --lm-hairline: oklch(1 0 0 / 6%);
 }
 
 @layer base {
@@ -119,24 +153,88 @@
   body {
     @apply bg-background text-foreground;
   }
+  ::selection {
+    background: var(--lm-brand-soft);
+  }
 }
 
-/* ── LeadMind AI brand layer ─────────────────────────────────────────────── */
+/* ── Layered surface treatment ────────────────────────────────────────────── */
 
-:root {
-  --lm-sidebar: #0b0e13;
-  --lm-sidebar-hover: #161b24;
-  --lm-brand: oklch(0.596 0.145 163.225); /* emerald-600 */
-  --lm-brand-soft: oklch(0.596 0.145 163.225 / 0.12);
+/* Primary panel: graphite surface with a hairline top highlight for depth */
+.lm-panel {
+  position: relative;
+  background:
+    linear-gradient(to bottom, var(--lm-hairline), transparent 28%),
+    var(--card);
 }
 
-.dark {
-  --lm-sidebar: #090c10;
-  --lm-sidebar-hover: #141922;
+/* Elevated panel for hero / spotlight content */
+.lm-panel-elevated {
+  position: relative;
+  background:
+    linear-gradient(to bottom, var(--lm-hairline), transparent 30%),
+    var(--lm-elevated);
 }
 
-/* Custom scrollbars */
-.lm-scroll::-webkit-scrollbar {
+/* Subtle brand ambience behind key sections (dashboard hero, login) */
+.lm-ambient {
+  position: relative;
+  overflow: hidden;
+}
+.lm-ambient::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(560px 200px at 12% -8%, var(--lm-brand-soft), transparent 70%),
+    radial-gradient(480px 180px at 88% -12%, var(--lm-info-soft), transparent 72%);
+}
+
+/* Gradient brand text for hero metrics */
+.lm-brand-text {
+  background: linear-gradient(100deg, var(--lm-brand), var(--lm-info));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ── Spotlight card (scoped to component via [data-spotlight]) ────────────── */
+
+[data-spotlight] {
+  --spot-x: 50%;
+  --spot-y: 50%;
+  position: relative;
+}
+[data-spotlight]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    260px circle at var(--spot-x) var(--spot-y),
+    var(--spot-color, var(--lm-brand-soft)),
+    transparent 65%
+  );
+  transition: opacity 0.35s ease;
+  z-index: 0;
+}
+[data-spotlight]:hover::before,
+[data-spotlight]:focus-within::before {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-spotlight]::before {
+    transition: none;
+  }
+}
+
+/* ── Custom scrollbars ────────────────────────────────────────────────────── */
+
+.lm-scroll::-webkit-scrollbar,
+[data-spotlight]::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
@@ -144,14 +242,16 @@
   background: transparent;
 }
 .lm-scroll::-webkit-scrollbar-thumb {
-  background: oklch(0.556 0 0 / 0.35);
+  background: var(--muted-foreground);
+  opacity: 0.35;
   border-radius: 8px;
 }
 .lm-scroll::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.556 0 0 / 0.55);
+  background: var(--muted-foreground);
 }
 
-/* Prose styling for markdown chat answers */
+/* ── Prose styling for markdown chat answers ──────────────────────────────── */
+
 .lm-prose {
   font-size: 0.875rem;
   line-height: 1.6;
@@ -222,6 +322,8 @@
   font-weight: 650;
 }
 
+/* ── Motion ───────────────────────────────────────────────────────────────── */
+
 /* Typing caret for streaming answers */
 @keyframes lm-caret {
   0%, 45% { opacity: 1; }
@@ -241,4 +343,23 @@
 }
 .lm-fade-up {
   animation: lm-fade-up 0.28s ease-out both;
+}
+
+@keyframes lm-pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.lm-pulse-dot {
+  animation: lm-pulse-dot 2.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lm-fade-up,
+  .lm-caret::after,
+  .lm-pulse-dot {
+    animation: none;
+  }
+  * {
+    scroll-behavior: auto !important;
+  }
 }

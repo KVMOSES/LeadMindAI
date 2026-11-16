@@ -8,6 +8,8 @@ import { api } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
 import type { SessionData } from "@/lib/store";
 import { EmptyState, PageHeader, PriorityBadge } from "@/components/lm/shared";
+import { MetalButton } from "@/components/ui/metal-button";
+import { SpotlightCard } from "@/components/ui/spotlight-card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -127,7 +129,11 @@ export function ActionsView({ session }: { session: SessionData }) {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Action Center" description="Evidence-based next-best actions awaiting a human decision" />
+      <PageHeader
+        eyebrow="Assist"
+        title="Next Best Action"
+        description="Evidence-based sales recommendations awaiting a human decision — accept, complete or dismiss with one click"
+      />
 
       <Tabs
         value={statusTab}
@@ -209,8 +215,12 @@ export function ActionsView({ session }: { session: SessionData }) {
           ) : (
             <div className="grid gap-4 lg:grid-cols-2">
               {items.map((rec) => (
-                <Card key={rec.id} className="gap-0 p-0">
-                  <CardContent className="p-4">
+                <SpotlightCard
+                  key={rec.id}
+                  className="gap-0 p-0"
+                  spotlightColor={rec.priority === "CRITICAL" ? "rgba(244,63,94,0.10)" : rec.priority === "HIGH" ? "var(--lm-brand-soft)" : "var(--lm-info-soft)"}
+                >
+                  <CardContent className="relative z-10 p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex min-w-0 flex-wrap items-center gap-2">
                         <PriorityBadge priority={rec.priority} />
@@ -226,7 +236,7 @@ export function ActionsView({ session }: { session: SessionData }) {
                     <button
                       type="button"
                       onClick={() => navigate("lead", { leadId: rec.leadId })}
-                      className="mt-2.5 max-w-full text-left text-sm font-medium text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400"
+                      className="mt-2.5 max-w-full text-left text-sm font-medium text-[var(--lm-brand)] underline-offset-2 hover:underline"
                       aria-label={`Open lead profile for ${rec.leadName}`}
                     >
                       {rec.leadName} — {rec.companyName}
@@ -240,7 +250,7 @@ export function ActionsView({ session }: { session: SessionData }) {
                           {rec.evidence.map((item, i) => (
                             <li key={i} className="flex items-start gap-1.5 text-xs text-muted-foreground">
                               <ChevronRight
-                                className="mt-0.5 size-3 shrink-0 text-emerald-600 dark:text-emerald-400"
+                                className="mt-0.5 size-3 shrink-0 text-[var(--lm-brand)]"
                                 aria-hidden="true"
                               />
                               <span>{item}</span>
@@ -253,6 +263,15 @@ export function ActionsView({ session }: { session: SessionData }) {
                     <div className="mt-4 flex flex-wrap items-center gap-2 border-t pt-3">
                       {rec.status === "PENDING" ? (
                         <>
+                          <MetalButton
+                            variant="success"
+                            size="sm"
+                            disabled={updatingId === rec.id}
+                            onClick={() => void handleUpdate(rec, "COMPLETED")}
+                          >
+                            <CheckCheck className="size-4" aria-hidden="true" />
+                            Mark completed
+                          </MetalButton>
                           <Button
                             variant="outline"
                             disabled={updatingId === rec.id}
@@ -260,14 +279,6 @@ export function ActionsView({ session }: { session: SessionData }) {
                           >
                             <Check className="size-4" aria-hidden="true" />
                             Accept
-                          </Button>
-                          <Button
-                            variant="outline"
-                            disabled={updatingId === rec.id}
-                            onClick={() => void handleUpdate(rec, "COMPLETED")}
-                          >
-                            <CheckCheck className="size-4" aria-hidden="true" />
-                            Completed
                           </Button>
                           <Button
                             variant="ghost"
@@ -289,7 +300,7 @@ export function ActionsView({ session }: { session: SessionData }) {
                       )}
                     </div>
                   </CardContent>
-                </Card>
+                </SpotlightCard>
               ))}
             </div>
           )}

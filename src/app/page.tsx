@@ -40,8 +40,10 @@ export default function Home() {
 
   if (status === "loading") {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[#0b0e13] text-zinc-300">
-        <Loader2 className="h-6 w-6 animate-spin text-emerald-400" />
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background text-muted-foreground">
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--lm-brand-soft)] ring-1 ring-[var(--lm-brand)]/30">
+          <Loader2 className="h-6 w-6 animate-spin text-[var(--lm-brand)]" />
+        </div>
         <p className="text-sm">Starting LeadMind AI…</p>
         {bootError && <p className="text-xs text-rose-400">{bootError}</p>}
       </div>

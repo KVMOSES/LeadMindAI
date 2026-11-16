@@ -49,20 +49,39 @@ export function StatCard({
   value,
   hint,
   tone = "default",
+  icon,
 }: {
   title: string;
   value: string | number;
   hint?: string;
-  tone?: "default" | "brand" | "warning" | "danger";
+  tone?: "default" | "brand" | "warning" | "danger" | "info";
+  icon?: React.ReactNode;
 }) {
   return (
-    <Card className="p-0 gap-0 overflow-hidden">
+    <Card className="lm-panel p-0 gap-0 overflow-hidden">
       <CardContent className="p-4">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{title}</p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">{title}</p>
+          {icon && (
+            <span
+              className={cn(
+                "flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
+                tone === "brand" && "bg-[var(--lm-brand-soft)] text-[var(--lm-brand)]",
+                tone === "info" && "bg-[var(--lm-info-soft)] text-[var(--lm-info)]",
+                tone === "warning" && "bg-amber-500/10 text-amber-500",
+                tone === "danger" && "bg-rose-500/10 text-rose-500",
+                tone === "default" && "bg-muted text-muted-foreground",
+              )}
+            >
+              {icon}
+            </span>
+          )}
+        </div>
         <p
           className={cn(
-            "mt-1.5 text-2xl font-semibold tabular-nums",
-            tone === "brand" && "text-emerald-600 dark:text-emerald-400",
+            "mt-1.5 text-2xl font-semibold tabular-nums tracking-tight",
+            tone === "brand" && "text-[var(--lm-brand)]",
+            tone === "info" && "text-[var(--lm-info)]",
             tone === "warning" && "text-amber-600 dark:text-amber-400",
             tone === "danger" && "text-rose-600 dark:text-rose-400",
           )}
@@ -162,7 +181,9 @@ export function ContributionBars({
 export function EmptyState({ title, description, icon }: { title: string; description?: string; icon?: React.ReactNode }) {
   return (
     <div className="flex flex-col items-center justify-center py-14 text-center">
-      {icon && <div className="mb-3 text-muted-foreground">{icon}</div>}
+      {icon && (
+        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-muted/60 text-muted-foreground">{icon}</div>
+      )}
       <p className="font-medium">{title}</p>
       {description && <p className="mt-1 max-w-md text-sm text-muted-foreground">{description}</p>}
     </div>
@@ -192,7 +213,7 @@ export function Markdown({ content, className }: { content: string; className?: 
     <div className={cn("lm-prose", className)}>
       <ReactMarkdown
         components={{
-          a: (props) => <a {...props} className="text-emerald-700 dark:text-emerald-400 underline underline-offset-2" target="_blank" rel="noreferrer" />,
+          a: (props) => <a {...props} className="text-[var(--lm-brand)] underline underline-offset-2" target="_blank" rel="noreferrer" />,
         }}
       >
         {content}
@@ -203,12 +224,25 @@ export function Markdown({ content, className }: { content: string; className?: 
 
 // ── Page header ──────────────────────────────────────────────────────────────
 
-export function PageHeader({ title, description, actions }: { title: string; description?: string; actions?: React.ReactNode }) {
+export function PageHeader({
+  title,
+  description,
+  actions,
+  eyebrow,
+}: {
+  title: string;
+  description?: string;
+  actions?: React.ReactNode;
+  eyebrow?: string;
+}) {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
-        {description && <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>}
+      <div className="min-w-0">
+        {eyebrow && (
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--lm-brand)]">{eyebrow}</p>
+        )}
+        <h1 className="text-xl font-semibold tracking-tight lg:text-2xl">{title}</h1>
+        {description && <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>

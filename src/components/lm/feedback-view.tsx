@@ -174,6 +174,7 @@ export function FeedbackView({ session }: { session: SessionData }) {
   return (
     <div className="space-y-6">
       <PageHeader
+        eyebrow="Model Ops"
         title="Feedback & Learning"
         description="How the sales team's feedback and recommendation outcomes shape LeadMind over time."
         actions={

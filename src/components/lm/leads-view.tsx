@@ -28,6 +28,7 @@ import { useAppStore } from "@/lib/store";
 import type { SessionData } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { EmptyState, PageHeader, QualBadge } from "@/components/lm/shared";
+import { LiquidGlassButton } from "@/components/ui/liquid-glass-button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -225,12 +226,13 @@ function ScoreCell({ value, percent = false }: { value: number | null; percent?:
   }
   const raw = percent ? Math.round(value * 100) : Math.round(value);
   const clamped = Math.min(100, Math.max(0, raw));
+  const barTone = raw >= 70 ? "[&>div]:bg-emerald-500" : raw >= 40 ? "[&>div]:bg-amber-500" : "[&>div]:bg-rose-500";
   return (
     <div className="flex items-center gap-2">
       <span className={cn("w-10 shrink-0 text-right text-sm font-medium tabular-nums", scoreColor(value))}>
         {percent ? `${raw}%` : raw}
       </span>
-      <Progress value={clamped} className="h-1 w-16 [&>div]:bg-emerald-500" />
+      <Progress value={clamped} className={cn("h-1 w-16", barTone)} />
     </div>
   );
 }
@@ -730,6 +732,7 @@ export function LeadsView({ session }: { session: SessionData }) {
   return (
     <div className="space-y-6">
       <PageHeader
+        eyebrow="Pipeline"
         title="Lead Universe"
         description="Search, filter and manage every lead in the workspace"
         actions={
@@ -744,7 +747,8 @@ export function LeadsView({ session }: { session: SessionData }) {
                 Export
               </a>
             </Button>
-            <Button
+            <LiquidGlassButton
+              variant="brand"
               onClick={() => {
                 setEditLead(null);
                 setFormOpen(true);
@@ -752,7 +756,7 @@ export function LeadsView({ session }: { session: SessionData }) {
             >
               <Plus className="size-4" aria-hidden="true" />
               New lead
-            </Button>
+            </LiquidGlassButton>
           </>
         }
       />
@@ -830,7 +834,7 @@ export function LeadsView({ session }: { session: SessionData }) {
       </div>
 
       {/* Table */}
-      <Card className="gap-0 overflow-hidden p-0">
+      <Card className="lm-panel gap-0 overflow-hidden p-0">
         <CardContent className="p-0">
           {error && (
             <div className="p-4">
@@ -895,7 +899,7 @@ export function LeadsView({ session }: { session: SessionData }) {
                   items.map((lead) => (
                     <TableRow
                       key={lead.id}
-                      className="cursor-pointer"
+                      className="cursor-pointer transition-colors hover:bg-muted/60"
                       onClick={() => navigate("lead", { leadId: lead.id })}
                     >
                       <TableCell>

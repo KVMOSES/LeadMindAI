@@ -29,6 +29,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Markdown, EmptyState } from "@/components/lm/shared";
+import { LiquidGlassButton } from "@/components/ui/liquid-glass-button";
 
 interface ToolTrace {
   name: string;
@@ -77,6 +78,9 @@ export function CopilotView({ session }: { session: SessionData }) {
   const [mobileListOpen, setMobileListOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // When send() creates a fresh conversation we optimistically append messages;
+  // the conversationId effect must not clobber them with an empty server thread.
+  const skipThreadLoadRef = useRef(false);
 
   const loadConversations = useCallback(async () => {
     try {
@@ -124,6 +128,10 @@ export function CopilotView({ session }: { session: SessionData }) {
 
   useEffect(() => {
     if (conversationId) {
+      if (skipThreadLoadRef.current) {
+        skipThreadLoadRef.current = false;
+        return;
+      }
       loadThread(conversationId);
     } else {
       setMessages([]);
@@ -167,6 +175,7 @@ export function CopilotView({ session }: { session: SessionData }) {
       try {
         const res = await api<{ conversation: { id: string } }>("/api/chat/conversations", { method: "POST", body: {} });
         convId = res.conversation.id;
+        skipThreadLoadRef.current = true;
         navigate("copilot", { conversationId: convId });
         await loadConversations();
       } catch (e) {
@@ -349,7 +358,7 @@ export function CopilotView({ session }: { session: SessionData }) {
                   key={c.id}
                   className={cn(
                     "group flex cursor-pointer items-start justify-between gap-2 rounded-md px-2 py-2 text-sm transition-colors",
-                    conversationId === c.id ? "bg-emerald-500/10 text-emerald-800 dark:text-emerald-300" : "hover:bg-muted",
+                    conversationId === c.id ? "bg-[var(--lm-brand-soft)] text-[var(--lm-brand)]" : "hover:bg-muted",
                   )}
                   onClick={() => {
                     navigate("copilot", { conversationId: c.id });
@@ -386,15 +395,15 @@ export function CopilotView({ session }: { session: SessionData }) {
           {/* Chat header */}
           <div className="flex items-center justify-between gap-2 border-b px-4 py-2.5">
             <div className="flex min-w-0 items-center gap-2">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-emerald-500/15 ring-1 ring-emerald-500/30">
-                <BrainCircuit className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[var(--lm-brand-soft)] ring-1 ring-[var(--lm-brand)]/30">
+                <BrainCircuit className="h-4 w-4 text-[var(--lm-brand)]" />
               </div>
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">LeadMind Copilot</p>
                 {contextLead ? (
                   <p className="truncate text-xs text-muted-foreground">
                     Context: {contextLead.label}
-                    <button className="ml-2 text-emerald-600 hover:underline dark:text-emerald-400" onClick={() => navigate("lead", { leadId: contextLead.id })}>
+                    <button className="ml-2 text-[var(--lm-brand)] hover:underline" onClick={() => navigate("lead", { leadId: contextLead.id })}>
                       open profile
                     </button>
                     <button className="ml-2 text-muted-foreground hover:underline" onClick={() => navigate("copilot")}>
@@ -407,7 +416,7 @@ export function CopilotView({ session }: { session: SessionData }) {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className={cn("text-[10px]", isDemo ? "border-amber-500/40 text-amber-600 dark:text-amber-400" : "border-emerald-500/40 text-emerald-600 dark:text-emerald-400")}>
+              <Badge variant="outline" className={cn("text-[10px]", isDemo ? "border-amber-500/40 text-amber-600 dark:text-amber-400" : "border-[var(--lm-brand)]/40 text-[var(--lm-brand)]")}>
                 {isDemo ? "DEMO MODE" : "LIVE LLM"}
               </Badge>
               {messages.length > 0 && (
@@ -444,7 +453,7 @@ export function CopilotView({ session }: { session: SessionData }) {
                           key={i}
                           onClick={() => send(s)}
                           disabled={sending}
-                          className="rounded-full border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-emerald-500/40 hover:text-emerald-700 dark:hover:text-emerald-300"
+                          className="rounded-full border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-[var(--lm-brand)]/40 hover:text-[var(--lm-brand)]"
                         >
                           {s}
                         </button>
@@ -456,8 +465,8 @@ export function CopilotView({ session }: { session: SessionData }) {
                 messages.map((m) => (
                   <div key={m.id} className={cn("flex gap-3", m.role === "USER" ? "justify-end" : "justify-start")}>
                     {m.role === "ASSISTANT" && (
-                      <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-emerald-500/15 ring-1 ring-emerald-500/30">
-                        <BrainCircuit className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                      <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[var(--lm-brand-soft)] ring-1 ring-[var(--lm-brand)]/30">
+                        <BrainCircuit className="h-4 w-4 text-[var(--lm-brand)]" />
                       </div>
                     )}
                     <div className={cn("max-w-[85%] space-y-2 sm:max-w-[80%]", m.role === "USER" && "flex flex-col items-end")}>
@@ -466,8 +475,8 @@ export function CopilotView({ session }: { session: SessionData }) {
                         className={cn(
                           "rounded-2xl px-4 py-3",
                           m.role === "USER"
-                            ? "bg-emerald-600 text-white"
-                            : "border bg-card",
+                            ? "bg-[var(--lm-brand)] text-[var(--primary-foreground)]"
+                            : "lm-panel border bg-card",
                           m.streaming && m.content.length === 0 && "animate-pulse",
                         )}
                       >
@@ -528,7 +537,7 @@ export function CopilotView({ session }: { session: SessionData }) {
 
               {statusLine && (
                 <div className="flex items-center gap-2 pl-10 text-xs text-muted-foreground">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-500" /> {statusLine}
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--lm-brand)]" /> {statusLine}
                 </div>
               )}
               <div ref={bottomRef} />
@@ -567,9 +576,16 @@ export function CopilotView({ session }: { session: SessionData }) {
                   <X className="h-4 w-4" />
                 </Button>
               ) : (
-                <Button size="icon" className="h-11 w-11" onClick={() => send(input)} disabled={!input.trim()} aria-label="Send message">
+                <LiquidGlassButton
+                  variant="brand"
+                  size="icon"
+                  className="h-11 w-11"
+                  onClick={() => send(input)}
+                  disabled={!input.trim()}
+                  aria-label="Send message"
+                >
                   <Send className="h-4 w-4" />
-                </Button>
+                </LiquidGlassButton>
               )}
             </div>
           </div>
@@ -584,7 +600,7 @@ function ToolTracePanel({ traces }: { traces: ToolTrace[] }) {
   return (
     <div className="w-full rounded-lg border bg-muted/40 text-xs">
       <button className="flex w-full items-center gap-2 px-3 py-2 text-left" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
-        <Wrench className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+        <Wrench className="h-3.5 w-3.5 text-[var(--lm-brand)]" />
         <span className="font-medium">{traces.length} tool execution{traces.length > 1 ? "s" : ""}</span>
         <span className="truncate text-muted-foreground">{traces.map((t) => t.name).join(", ")}</span>
         <ChevronDown className={cn("ml-auto h-3.5 w-3.5 transition-transform", open && "rotate-180")} />

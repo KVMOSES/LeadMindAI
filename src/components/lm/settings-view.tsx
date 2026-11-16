@@ -97,7 +97,7 @@ function ChipSelect({
             aria-pressed={on}
             className={cn(
               "rounded-full border px-2.5 py-1 text-xs transition-colors",
-              on ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "text-muted-foreground hover:border-foreground/30",
+              on ? "border-[var(--lm-brand)]/50 bg-[var(--lm-brand-soft)] text-[var(--lm-brand)]" : "text-muted-foreground hover:border-foreground/30",
             )}
           >
             {on && <Check className="mr-1 inline h-3 w-3" />}
@@ -316,7 +316,7 @@ export function SettingsView({ session }: { session: SessionData }) {
                             max={40}
                             value={icp.weights[k]}
                             onChange={(e) => setIcp({ ...icp, weights: { ...icp.weights, [k]: Number(e.target.value) } })}
-                            className="flex-1 accent-emerald-600"
+                            className="flex-1 accent-[var(--lm-brand)]"
                             aria-label={`${k} weight`}
                           />
                           <span className="w-8 text-right text-xs tabular-nums">{icp.weights[k]}</span>
@@ -489,7 +489,7 @@ export function SettingsView({ session }: { session: SessionData }) {
                   {docs.map((d) => (
                     <div key={d.id} className="flex items-center justify-between gap-3 rounded-md border px-3 py-2.5">
                       <div className="flex min-w-0 items-center gap-3">
-                        <FileText className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                        <FileText className="h-4 w-4 shrink-0 text-[var(--lm-brand)]" />
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium">{d.name}</p>
                           <p className="text-xs text-muted-foreground">
@@ -583,7 +583,7 @@ export function SettingsView({ session }: { session: SessionData }) {
                       : "No external LLM configured. The local demo assistant answers a fixed set of analytical queries using the same validated tools and real workspace data."}
                   </p>
                 </div>
-                <Badge variant="outline" className={cn("shrink-0", session.llmMode === "live" ? "border-emerald-500/40 text-emerald-600 dark:text-emerald-400" : "border-amber-500/40 text-amber-600 dark:text-amber-400")}>
+                <Badge variant="outline" className={cn("shrink-0", session.llmMode === "live" ? "border-[var(--lm-brand)]/40 text-[var(--lm-brand)]" : "border-amber-500/40 text-amber-600 dark:text-amber-400")}>
                   {session.llmMode === "live" ? "LIVE LLM" : "DEMO ASSISTANT"}
                 </Badge>
               </div>
@@ -602,7 +602,7 @@ export function SettingsView({ session }: { session: SessionData }) {
                 <Badge variant="outline">{memories.filter((m) => m.approved).length}</Badge>
               </div>
               <div className="rounded-md bg-muted/50 px-3 py-3 text-xs text-muted-foreground">
-                <p className="mb-1 flex items-center gap-1.5 font-medium text-foreground"><Sparkles className="h-3.5 w-3.5 text-emerald-500" /> Safety rules</p>
+                <p className="mb-1 flex items-center gap-1.5 font-medium text-foreground"><Sparkles className="h-3.5 w-3.5 text-[var(--lm-brand)]" /> Safety rules</p>
                 <ul className="list-inside space-y-0.5">
                   <li>· Write actions (create lead, update lead, record outcome, store memory) require explicit user confirmation.</li>
                   <li>· Tool results and documents are treated as data, never as instructions (prompt-injection resistance).</li>

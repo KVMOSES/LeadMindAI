@@ -1,7 +1,21 @@
 "use client";
 
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
-import { Activity, ArrowRight, Factory, ListChecks, RefreshCw, TriangleAlert } from "lucide-react";
+import {
+  Activity,
+  ArrowRight,
+  BrainCircuit,
+  Factory,
+  Gauge,
+  ListChecks,
+  RefreshCw,
+  Sparkles,
+  Target,
+  Thermometer,
+  TriangleAlert,
+  TrendingUp,
+  Users,
+} from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -22,6 +36,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { SpotlightCard } from "@/components/ui/spotlight-card";
 import { cn } from "@/lib/utils";
 
 // ── Local types ──────────────────────────────────────────────────────────────
@@ -46,6 +61,13 @@ interface PipelineDatum {
   color: string;
 }
 
+interface Insight {
+  id: string;
+  icon: typeof TrendingUp;
+  tone: "brand" | "info" | "success" | "warning";
+  text: string;
+}
+
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const CHART_TOOLTIP_STYLE: CSSProperties = {
@@ -54,6 +76,9 @@ const CHART_TOOLTIP_STYLE: CSSProperties = {
   borderRadius: 8,
   fontSize: 12,
 };
+
+const BRAND = "#8b7cf6";
+const INFO = "#7fb5fa";
 
 // ── Formatting helpers ───────────────────────────────────────────────────────
 
@@ -79,8 +104,8 @@ function fmtConversion(rate: number | null): string {
 }
 
 function activityDotColor(type: string): string {
-  if (type === "EVENT") return "bg-emerald-500";
-  if (type === "OUTCOME") return "bg-violet-500";
+  if (type === "EVENT") return "bg-[var(--lm-info)]";
+  if (type === "OUTCOME") return "bg-[var(--lm-brand)]";
   return "bg-zinc-400";
 }
 
@@ -92,25 +117,39 @@ function PanelCard({
   actions,
   className,
   children,
+  spotlight = false,
+  spotlightColor,
 }: {
   title: string;
   subtitle?: string;
   actions?: ReactNode;
   className?: string;
   children: ReactNode;
+  spotlight?: boolean;
+  spotlightColor?: string;
 }) {
-  return (
-    <Card className={cn("p-0 gap-0", className)}>
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="text-sm font-medium">{title}</h2>
-            {subtitle && <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>}
-          </div>
-          {actions && <div className="shrink-0">{actions}</div>}
+  const inner = (
+    <CardContent className="relative z-10 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-sm font-medium">{title}</h2>
+          {subtitle && <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>}
         </div>
-        {children}
-      </CardContent>
+        {actions && <div className="shrink-0">{actions}</div>}
+      </div>
+      {children}
+    </CardContent>
+  );
+  if (spotlight) {
+    return (
+      <SpotlightCard className={cn("gap-0 p-0", className)} spotlightColor={spotlightColor}>
+        {inner}
+      </SpotlightCard>
+    );
+  }
+  return (
+    <Card className={cn("lm-panel gap-0 p-0", className)}>
+      {inner}
     </Card>
   );
 }
@@ -185,17 +224,68 @@ export function DashboardView({ session }: { session: SessionData }) {
     });
   }, [data]);
 
+  // AI business insights — derived strictly from the live dashboard payload
+  const insights = useMemo<Insight[]>(() => {
+    if (!data) return [];
+    const list: Insight[] = [];
+    const total = data.counts.leads;
+    if (total > 0) {
+      const readyShare = Math.round((data.counts.salesReady / total) * 100);
+      list.push({
+        id: "ready",
+        icon: Target,
+        tone: "success",
+        text: `${data.counts.salesReady} of ${total} leads (${readyShare}%) are Sales Ready — ${
+          readyShare >= 25 ? "a strong active pipeline" : "worth reviewing nurture thresholds"
+        }.`,
+      });
+    }
+    if (data.counts.predictions > 0) {
+      list.push({
+        id: "pred",
+        icon: Gauge,
+        tone: "brand",
+        text: `The model predicts ${data.conversionEstimate.predictedWinners} likely conversions across ${data.counts.predictions} scored leads${
+          data.averages.intent !== null ? `, with average buying intent at ${Math.round(data.averages.intent)}/100` : ""
+        }.`,
+      });
+    }
+    const bestIndustry = sortedIndustries.find((i) => i.conversionRate !== null && i.won > 0);
+    if (bestIndustry) {
+      list.push({
+        id: "ind",
+        icon: Factory,
+        tone: "info",
+        text: `${bestIndustry.industry} converts best so far (${fmtConversion(bestIndustry.conversionRate)} from ${bestIndustry.won} won) — prioritise similar verticals.`,
+      });
+    }
+    const topRec = data.topRecommendations[0];
+    if (topRec) {
+      list.push({
+        id: "rec",
+        icon: Sparkles,
+        tone: "warning",
+        text: `Highest-priority next step: ${prettifyAction(topRec.action).toLowerCase()} at ${topRec.companyName}.`,
+      });
+    }
+    return list.slice(0, 4);
+  }, [data, sortedIndustries]);
+
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Intelligence Command Center"
-        description={`Live pipeline intelligence for ${session.workspace.name}`}
+        eyebrow="Command Center"
+        title="Pipeline intelligence"
+        description={`Live fit, intent and conversion intelligence for ${session.workspace.name}`}
         actions={
           <>
             {data && (
               <Badge variant="outline" className="gap-1.5 font-normal text-muted-foreground">
                 <span
-                  className={cn("h-1.5 w-1.5 rounded-full", data.llmMode === "live" ? "bg-emerald-500" : "bg-zinc-400")}
+                  className={cn(
+                    "h-1.5 w-1.5 rounded-full",
+                    data.llmMode === "live" ? "bg-emerald-500 lm-pulse-dot" : "bg-zinc-400",
+                  )}
                   aria-hidden="true"
                 />
                 {data.llmMode === "live" ? "LLM live" : "LLM demo"}
@@ -237,172 +327,65 @@ export function DashboardView({ session }: { session: SessionData }) {
         </Alert>
       ) : data && weeks ? (
         <>
-          {/* ── KPI row ─────────────────────────────────────────────────── */}
+          {/* ── KPI strip ─────────────────────────────────────────────────── */}
           <section aria-label="Key performance indicators" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            <StatCard title="Total leads" value={data.counts.leads} hint={`${data.counts.activeLeads} active`} />
-            <StatCard title="Sales Ready" value={data.counts.salesReady} tone="brand" />
-            <StatCard title="Nurture Track" value={data.counts.nurture} tone="warning" />
-            <StatCard title="Avg fit" value={fmtScore(data.averages.fit)} />
-            <StatCard title="Avg intent" value={fmtScore(data.averages.intent)} />
+            <StatCard title="Total leads" value={data.counts.leads} hint={`${data.counts.activeLeads} active`} icon={<Users className="size-3.5" />} />
+            <StatCard title="Sales Ready" value={data.counts.salesReady} tone="brand" icon={<Target className="size-3.5" />} />
+            <StatCard title="Nurture Track" value={data.counts.nurture} tone="warning" icon={<Thermometer className="size-3.5" />} />
+            <StatCard title="Avg fit" value={fmtScore(data.averages.fit)} tone="info" icon={<Gauge className="size-3.5" />} />
+            <StatCard title="Avg intent" value={fmtScore(data.averages.intent)} icon={<TrendingUp className="size-3.5" />} />
             <StatCard
               title="Predictions"
               value={data.counts.predictions}
               hint={`${data.conversionEstimate.predictedWinners} predicted winners`}
+              icon={<BrainCircuit className="size-3.5" />}
             />
           </section>
 
-          {/* ── Charts row ──────────────────────────────────────────────── */}
-          <section aria-label="Pipeline and engagement charts" className="grid gap-4 lg:grid-cols-2">
-            <PanelCard title="Pipeline distribution" subtitle="Leads by qualification category">
-              <div className="mt-4 h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={pipelineData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                    <XAxis
-                      dataKey="name"
-                      tickLine={false}
-                      axisLine={false}
-                      tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
-                      interval="preserveStartEnd"
-                      minTickGap={16}
-                    />
-                    <YAxis
-                      tickLine={false}
-                      axisLine={false}
-                      width={36}
-                      tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
-                      allowDecimals={false}
-                    />
-                    <ChartTooltip cursor={{ fill: "var(--muted)", opacity: 0.6 }} contentStyle={CHART_TOOLTIP_STYLE} />
-                    <Bar dataKey="value" name="Leads" radius={[6, 6, 0, 0]} maxBarSize={44}>
-                      {pipelineData.map((d) => (
-                        <Cell key={d.name} fill={d.color} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </PanelCard>
-
+          {/* ── Bento: AI insights + model status ─────────────────────────── */}
+          <section aria-label="AI insights and model status" className="grid gap-4 lg:grid-cols-3">
             <PanelCard
-              title="Engagement trend (12 weeks)"
-              subtitle="Weekly event volume and average intent score"
+              spotlight
+              spotlightColor="var(--lm-brand-soft)"
+              title="AI business insights"
+              subtitle="Generated from this workspace's live data"
+              className="lg:col-span-2"
               actions={
-                <div className="flex items-center gap-3" aria-hidden="true">
-                  <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    Events
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                    Avg intent
-                  </span>
-                </div>
+                <Badge variant="outline" className="gap-1 text-[10px] text-muted-foreground">
+                  <Sparkles className="size-3 text-[var(--lm-brand)]" aria-hidden="true" />
+                  auto-generated
+                </Badge>
               }
             >
-              <div className="mt-4 h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={weeks} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-                    <defs>
-                      <linearGradient id="lmTrendEvents" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#10b981" stopOpacity={0.28} />
-                        <stop offset="100%" stopColor="#10b981" stopOpacity={0.02} />
-                      </linearGradient>
-                      <linearGradient id="lmTrendIntent" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.22} />
-                        <stop offset="100%" stopColor="#f59e0b" stopOpacity={0.02} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                    <XAxis
-                      dataKey="label"
-                      tickLine={false}
-                      axisLine={false}
-                      tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
-                      interval="preserveStartEnd"
-                      minTickGap={24}
-                    />
-                    <YAxis
-                      tickLine={false}
-                      axisLine={false}
-                      width={32}
-                      tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
-                      allowDecimals={false}
-                    />
-                    <ChartTooltip contentStyle={CHART_TOOLTIP_STYLE} cursor={{ stroke: "var(--border)" }} />
-                    <Area type="monotone" dataKey="events" name="Events" stroke="#10b981" strokeWidth={2} fill="url(#lmTrendEvents)" />
-                    <Area
-                      type="monotone"
-                      dataKey="avgIntent"
-                      name="Avg intent"
-                      stroke="#f59e0b"
-                      strokeWidth={2}
-                      fill="url(#lmTrendIntent)"
-                      connectNulls
-                      dot={false}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </PanelCard>
-          </section>
-
-          {/* ── Recommendations + model status ──────────────────────────── */}
-          <section aria-label="Recommended actions and model status" className="grid gap-4 lg:grid-cols-3">
-            <PanelCard
-              title="Recommended actions"
-              subtitle="AI-generated next steps, highest priority first"
-              className="lg:col-span-2"
-            >
-              {data.topRecommendations.length === 0 ? (
+              {insights.length === 0 ? (
                 <EmptyState
-                  title="No pending recommendations"
-                  description="Next-best actions will appear here as leads engage with your pipeline."
-                  icon={<ListChecks className="size-6" aria-hidden="true" />}
+                  title="Not enough data for insights yet"
+                  description="Insights appear as soon as leads are assessed by the fit, intent and prediction engines."
+                  icon={<Sparkles className="size-6" aria-hidden="true" />}
                 />
               ) : (
-                <>
-                  <ul className="mt-3 space-y-1">
-                    {data.topRecommendations.slice(0, 5).map((rec) => (
-                      <li key={rec.id}>
-                        <button
-                          type="button"
-                          onClick={() => navigate("lead", { leadId: rec.leadId })}
-                          aria-label={`${prettifyAction(rec.action)} — open lead ${rec.leadName}`}
-                          className="flex w-full items-start gap-3 rounded-lg p-2.5 text-left transition-colors hover:bg-muted/60"
-                        >
-                          <PriorityBadge priority={rec.priority} />
-                          <span className="min-w-0 flex-1">
-                            <span className="flex items-center justify-between gap-2">
-                              <span className="truncate text-sm font-medium">{prettifyAction(rec.action)}</span>
-                              <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                            </span>
-                            <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                              {rec.leadName} · {rec.companyName}
-                            </span>
-                            <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
-                              {truncate(rec.explanation, 110)}
-                            </span>
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="mt-2 w-full text-muted-foreground"
-                    onClick={() => navigate("actions")}
-                    aria-label="Open action center"
-                  >
-                    View all in Action Center
-                    <ArrowRight className="size-3.5" aria-hidden="true" />
-                  </Button>
-                </>
+                <ul className="mt-3 space-y-2.5">
+                  {insights.map((insight) => (
+                    <li key={insight.id} className="flex items-start gap-2.5">
+                      <span
+                        className={cn(
+                          "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
+                          insight.tone === "brand" && "bg-[var(--lm-brand-soft)] text-[var(--lm-brand)]",
+                          insight.tone === "info" && "bg-[var(--lm-info-soft)] text-[var(--lm-info)]",
+                          insight.tone === "success" && "bg-emerald-500/10 text-emerald-500",
+                          insight.tone === "warning" && "bg-amber-500/10 text-amber-500",
+                        )}
+                      >
+                        <insight.icon className="size-3.5" aria-hidden="true" />
+                      </span>
+                      <p className="text-sm leading-relaxed text-foreground/90">{insight.text}</p>
+                    </li>
+                  ))}
+                </ul>
               )}
             </PanelCard>
 
-            <PanelCard title="Model status" subtitle="Conversion prediction engine">
+            <PanelCard title="Model status" subtitle="Conversion prediction engine" spotlight spotlightColor="var(--lm-info-soft)">
               {data.modelStatus ? (
                 <div className="mt-3 space-y-3">
                   <div className="flex items-center justify-between gap-2">
@@ -459,8 +442,188 @@ export function DashboardView({ session }: { session: SessionData }) {
             </PanelCard>
           </section>
 
-          {/* ── Industry performance + recent activity ──────────────────── */}
-          <section aria-label="Industry performance and recent activity" className="grid gap-4 lg:grid-cols-2">
+          {/* ── Bento: trend + pipeline ───────────────────────────────────── */}
+          <section aria-label="Pipeline and engagement charts" className="grid gap-4 lg:grid-cols-3">
+            <PanelCard
+              title="Engagement trend (12 weeks)"
+              subtitle="Weekly event volume and average intent score"
+              className="lg:col-span-2"
+              actions={
+                <div className="flex items-center gap-3" aria-hidden="true">
+                  <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--lm-brand)]" />
+                    Events
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--lm-info)]" />
+                    Avg intent
+                  </span>
+                </div>
+              }
+            >
+              <div className="mt-4 h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={weeks} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                    <defs>
+                      <linearGradient id="lmTrendEvents" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={BRAND} stopOpacity={0.28} />
+                        <stop offset="100%" stopColor={BRAND} stopOpacity={0.02} />
+                      </linearGradient>
+                      <linearGradient id="lmTrendIntent" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={INFO} stopOpacity={0.22} />
+                        <stop offset="100%" stopColor={INFO} stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                    <XAxis
+                      dataKey="label"
+                      tickLine={false}
+                      axisLine={false}
+                      tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                      interval="preserveStartEnd"
+                      minTickGap={24}
+                    />
+                    <YAxis
+                      tickLine={false}
+                      axisLine={false}
+                      width={32}
+                      tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                      allowDecimals={false}
+                    />
+                    <ChartTooltip contentStyle={CHART_TOOLTIP_STYLE} cursor={{ stroke: "var(--border)" }} />
+                    <Area type="monotone" dataKey="events" name="Events" stroke={BRAND} strokeWidth={2} fill="url(#lmTrendEvents)" />
+                    <Area
+                      type="monotone"
+                      dataKey="avgIntent"
+                      name="Avg intent"
+                      stroke={INFO}
+                      strokeWidth={2}
+                      fill="url(#lmTrendIntent)"
+                      connectNulls
+                      dot={false}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </PanelCard>
+
+            <PanelCard title="Pipeline distribution" subtitle="Leads by qualification category">
+              <div className="mt-4 h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={pipelineData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                    <XAxis
+                      dataKey="name"
+                      tickLine={false}
+                      axisLine={false}
+                      tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                      interval="preserveStartEnd"
+                      minTickGap={16}
+                    />
+                    <YAxis
+                      tickLine={false}
+                      axisLine={false}
+                      width={36}
+                      tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                      allowDecimals={false}
+                    />
+                    <ChartTooltip cursor={{ fill: "var(--muted)", opacity: 0.6 }} contentStyle={CHART_TOOLTIP_STYLE} />
+                    <Bar dataKey="value" name="Leads" radius={[6, 6, 0, 0]} maxBarSize={44}>
+                      {pipelineData.map((d) => (
+                        <Cell key={d.name} fill={d.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </PanelCard>
+          </section>
+
+          {/* ── Bento: recommendations + activity ─────────────────────────── */}
+          <section aria-label="Recommended actions and recent activity" className="grid gap-4 lg:grid-cols-3">
+            <PanelCard
+              title="Recommended actions"
+              subtitle="AI-generated next steps, highest priority first"
+              className="lg:col-span-2"
+            >
+              {data.topRecommendations.length === 0 ? (
+                <EmptyState
+                  title="No pending recommendations"
+                  description="Next-best actions will appear here as leads engage with your pipeline."
+                  icon={<ListChecks className="size-6" aria-hidden="true" />}
+                />
+              ) : (
+                <>
+                  <ul className="mt-3 space-y-1">
+                    {data.topRecommendations.slice(0, 5).map((rec) => (
+                      <li key={rec.id}>
+                        <button
+                          type="button"
+                          onClick={() => navigate("lead", { leadId: rec.leadId })}
+                          aria-label={`${prettifyAction(rec.action)} — open lead ${rec.leadName}`}
+                          className="flex w-full items-start gap-3 rounded-lg p-2.5 text-left transition-colors hover:bg-muted/60"
+                        >
+                          <PriorityBadge priority={rec.priority} />
+                          <span className="min-w-0 flex-1">
+                            <span className="flex items-center justify-between gap-2">
+                              <span className="truncate text-sm font-medium">{prettifyAction(rec.action)}</span>
+                              <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                            </span>
+                            <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                              {rec.leadName} · {rec.companyName}
+                            </span>
+                            <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+                              {truncate(rec.explanation, 110)}
+                            </span>
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-2 w-full text-muted-foreground"
+                    onClick={() => navigate("actions")}
+                    aria-label="Open next best action workspace"
+                  >
+                    View all in Next Best Action
+                    <ArrowRight className="size-3.5" aria-hidden="true" />
+                  </Button>
+                </>
+              )}
+            </PanelCard>
+
+            <PanelCard title="Recent activity" subtitle="Lead signals from the last 14 days" spotlight spotlightColor="var(--lm-info-soft)">
+              {data.activity.length === 0 ? (
+                <EmptyState
+                  title="No recent activity"
+                  description="Events, outcomes, and signals will stream in here as leads engage."
+                  icon={<Activity className="size-6" aria-hidden="true" />}
+                />
+              ) : (
+                <ul className="lm-scroll mt-3 max-h-80 space-y-0.5 overflow-y-auto">
+                  {data.activity.map((item) => (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        onClick={() => navigate("lead", { leadId: item.leadId })}
+                        aria-label={`${item.label} — open lead`}
+                        className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-muted/60"
+                      >
+                        <span className={cn("h-2 w-2 shrink-0 rounded-full", activityDotColor(item.type))} aria-hidden="true" />
+                        <span className="min-w-0 flex-1 truncate text-sm">{item.label}</span>
+                        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{fmtRelative(item.at)}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </PanelCard>
+          </section>
+
+          {/* ── Industry performance ──────────────────────────────────────── */}
+          <section aria-label="Industry performance">
             <PanelCard title="Industry performance" subtitle="Verticals ranked by conversion rate">
               {sortedIndustries.length === 0 ? (
                 <EmptyState
@@ -501,33 +664,6 @@ export function DashboardView({ session }: { session: SessionData }) {
                     </TableBody>
                   </Table>
                 </div>
-              )}
-            </PanelCard>
-
-            <PanelCard title="Recent activity" subtitle="Lead signals from the last 14 days">
-              {data.activity.length === 0 ? (
-                <EmptyState
-                  title="No recent activity"
-                  description="Events, outcomes, and signals will stream in here as leads engage."
-                  icon={<Activity className="size-6" aria-hidden="true" />}
-                />
-              ) : (
-                <ul className="lm-scroll mt-3 max-h-80 space-y-0.5 overflow-y-auto">
-                  {data.activity.map((item) => (
-                    <li key={item.id}>
-                      <button
-                        type="button"
-                        onClick={() => navigate("lead", { leadId: item.leadId })}
-                        aria-label={`${item.label} — open lead`}
-                        className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-muted/60"
-                      >
-                        <span className={cn("h-2 w-2 shrink-0 rounded-full", activityDotColor(item.type))} aria-hidden="true" />
-                        <span className="min-w-0 flex-1 truncate text-sm">{item.label}</span>
-                        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{fmtRelative(item.at)}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
               )}
             </PanelCard>
           </section>

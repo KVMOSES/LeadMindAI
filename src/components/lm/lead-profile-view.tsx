@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { ContributionBars, EmptyState, EventPill, FactorList, QualBadge, ScoreRing } from "@/components/lm/shared";
+import { LiquidGlassButton } from "@/components/ui/liquid-glass-button";
 import { cn } from "@/lib/utils";
 
 interface FitPayload {
@@ -303,10 +304,10 @@ export function LeadProfileView({ session }: { session: SessionData }) {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => runAssessment(false)} disabled={assessing} className="h-9">
+            <LiquidGlassButton variant="brand" onClick={() => runAssessment(false)} disabled={assessing} className="h-9">
               {assessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
               Run assessment
-            </Button>
+            </LiquidGlassButton>
             <Button variant="outline" onClick={() => runAssessment(true)} disabled={assessing} className="h-9">
               <Gauge className="mr-2 h-4 w-4" /> Force recompute
             </Button>

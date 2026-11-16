@@ -1,0 +1,1005 @@
+     1→"use client";
+     2→
+     3→import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+     4→import {
+     5→  ArrowDown,
+     6→  ArrowUp,
+     7→  ArrowUpDown,
+     8→  ChevronLeft,
+     9→  ChevronRight,
+    10→  Download,
+    11→  Eye,
+    12→  FileUp,
+    13→  MoreHorizontal,
+    14→  Pencil,
+    15→  Plus,
+    16→  RefreshCw,
+    17→  Search,
+    18→  Sparkles,
+    19→  TriangleAlert,
+    20→  Upload,
+    21→  Users,
+    22→} from "lucide-react";
+    23→import { toast } from "sonner";
+    24→
+    25→import { api, fmtMoney, fmtRelative, qualLabel, scoreColor } from "@/lib/api";
+    26→import type { LeadRowClient } from "@/lib/api";
+    27→import { useAppStore } from "@/lib/store";
+    28→import type { SessionData } from "@/lib/store";
+    29→import { cn } from "@/lib/utils";
+    30→import { EmptyState, PageHeader, QualBadge } from "@/components/lm/shared";
+    31→import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+    32→import { Button } from "@/components/ui/button";
+    33→import { Card, CardContent } from "@/components/ui/card";
+    34→import {
+    35→  Dialog,
+    36→  DialogContent,
+    37→  DialogDescription,
+    38→  DialogFooter,
+    39→  DialogHeader,
+    40→  DialogTitle,
+    41→} from "@/components/ui/dialog";
+    42→import {
+    43→  DropdownMenu,
+    44→  DropdownMenuContent,
+    45→  DropdownMenuItem,
+    46→  DropdownMenuSeparator,
+    47→  DropdownMenuTrigger,
+    48→} from "@/components/ui/dropdown-menu";
+    49→import { Input } from "@/components/ui/input";
+    50→import { Label } from "@/components/ui/label";
+    51→import { Progress } from "@/components/ui/progress";
+    52→import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+    53→import { Skeleton } from "@/components/ui/skeleton";
+    54→import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+    55→import { Textarea } from "@/components/ui/textarea";
+    56→
+    57→// ── Constants ────────────────────────────────────────────────────────────────
+    58→
+    59→const PAGE_SIZE = 25;
+    60→const SEARCH_DEBOUNCE_MS = 350;
+    61→const UNSET = "__unset";
+    62→const CSV_SAMPLE_HEADER = "Company,Contact,Industry,Employees,Revenue band,Country,Email,Title,Deal value";
+    63→
+    64→const QUALIFICATIONS = ["SALES_READY", "NURTURE_TRACK", "KEEP_WARM", "MANUAL_REVIEW"] as const;
+    65→
+    66→const SORT_FIELDS = [
+    67→  { value: "recent", label: "Recent" },
+    68→  { value: "fit", label: "Fit" },
+    69→  { value: "intent", label: "Intent" },
+    70→  { value: "probability", label: "Probability" },
+    71→  { value: "dealValue", label: "Deal value" },
+    72→  { value: "name", label: "Company" },
+    73→] as const;
+    74→
+    75→const REVENUE_BANDS = ["<1M", "1M-10M", "10M-50M", "50M-100M", "100M+"] as const;
+    76→
+    77→const BUSINESS_MODELS: { value: string; label: string }[] = [
+    78→  { value: "B2B_SAAS", label: "B2B SaaS" },
+    79→  { value: "ENTERPRISE", label: "Enterprise" },
+    80→  { value: "MARKETPLACE", label: "Marketplace" },
+    81→  { value: "B2C", label: "B2C" },
+    82→  { value: "AGENCY", label: "Agency" },
+    83→  { value: "OTHER", label: "Other" },
+    84→];
+    85→
+    86→const SOURCES: { value: string; label: string }[] = [
+    87→  { value: "WEBSITE", label: "Website" },
+    88→  { value: "REFERRAL", label: "Referral" },
+    89→  { value: "OUTBOUND", label: "Outbound" },
+    90→  { value: "EVENT", label: "Event" },
+    91→  { value: "IMPORT", label: "Import" },
+    92→  { value: "MANUAL", label: "Manual" },
+    93→  { value: "PARTNER", label: "Partner" },
+    94→];
+    95→
+    96→// ── Types ────────────────────────────────────────────────────────────────────
+    97→
+    98→type SortField = (typeof SORT_FIELDS)[number]["value"];
+    99→type SortOrder = "asc" | "desc";
+   100→
+   101→interface LeadsResponse {
+   102→  ok: boolean;
+   103→  items: LeadRowClient[];
+   104→  total: number;
+   105→  page: number;
+   106→  pageSize: number;
+   107→  facets: { industries: string[] };
+   108→}
+   109→
+   110→interface LeadFormValues {
+   111→  companyName: string;
+   112→  contactName: string;
+   113→  industry: string;
+   114→  employeeCount: string;
+   115→  revenueBand: string;
+   116→  country: string;
+   117→  businessModel: string;
+   118→  email: string;
+   119→  title: string;
+   120→  phone: string;
+   121→  dealValue: string;
+   122→  source: string;
+   123→}
+   124→
+   125→const EMPTY_FORM: LeadFormValues = {
+   126→  companyName: "",
+   127→  contactName: "",
+   128→  industry: "",
+   129→  employeeCount: "",
+   130→  revenueBand: "",
+   131→  country: "",
+   132→  businessModel: "",
+   133→  email: "",
+   134→  title: "",
+   135→  phone: "",
+   136→  dealValue: "",
+   137→  source: "",
+   138→};
+   139→
+   140→interface LeadCreatePayload {
+   141→  companyName: string;
+   142→  contactName: string;
+   143→  industry?: string;
+   144→  employeeCount?: number;
+   145→  revenueBand?: string;
+   146→  country?: string;
+   147→  businessModel?: string;
+   148→  email?: string;
+   149→  title?: string;
+   150→  phone?: string;
+   151→  dealValue?: number;
+   152→  source?: string;
+   153→}
+   154→
+   155→interface LeadPatchPayload {
+   156→  contactName?: string;
+   157→  email?: string | null;
+   158→  phone?: string | null;
+   159→  title?: string | null;
+   160→  dealValue?: number | null;
+   161→  industry?: string | null;
+   162→  employeeCount?: number | null;
+   163→  revenueBand?: string | null;
+   164→  country?: string | null;
+   165→  businessModel?: string | null;
+   166→}
+   167→
+   168→interface ImportResult {
+   169→  ok: boolean;
+   170→  created: number;
+   171→  skipped: number;
+   172→  errors: string[];
+   173→}
+   174→
+   175→// ── Helpers ──────────────────────────────────────────────────────────────────
+   176→
+   177→function parseNumber(raw: string): number | null {
+   178→  const trimmed = raw.trim();
+   179→  if (!trimmed) return null;
+   180→  const parsed = Number(trimmed);
+   181→  return Number.isFinite(parsed) ? parsed : null;
+   182→}
+   183→
+   184→function buildCreatePayload(form: LeadFormValues): LeadCreatePayload {
+   185→  const employees = parseNumber(form.employeeCount);
+   186→  const dealValue = parseNumber(form.dealValue);
+   187→  return {
+   188→    companyName: form.companyName.trim(),
+   189→    contactName: form.contactName.trim(),
+   190→    industry: form.industry.trim() || undefined,
+   191→    employeeCount: employees ?? undefined,
+   192→    revenueBand: form.revenueBand || undefined,
+   193→    country: form.country.trim() || undefined,
+   194→    businessModel: form.businessModel || undefined,
+   195→    email: form.email.trim() || undefined,
+   196→    title: form.title.trim() || undefined,
+   197→    phone: form.phone.trim() || undefined,
+   198→    dealValue: dealValue ?? undefined,
+   199→    source: form.source || undefined,
+   200→  };
+   201→}
+   202→
+   203→function buildPatchPayload(form: LeadFormValues): LeadPatchPayload {
+   204→  const employees = parseNumber(form.employeeCount);
+   205→  const dealValue = parseNumber(form.dealValue);
+   206→  return {
+   207→    contactName: form.contactName.trim(),
+   208→    email: form.email.trim() || null,
+   209→    phone: form.phone.trim() || null,
+   210→    title: form.title.trim() || null,
+   211→    dealValue,
+   212→    industry: form.industry.trim() || null,
+   213→    employeeCount: employees,
+   214→    revenueBand: form.revenueBand || null,
+   215→    country: form.country.trim() || null,
+   216→    businessModel: form.businessModel || null,
+   217→  };
+   218→}
+   219→
+   220→// ── Small presentational pieces ──────────────────────────────────────────────
+   221→
+   222→function ScoreCell({ value, percent = false }: { value: number | null; percent?: boolean }) {
+   223→  if (value === null) {
+   224→    return <span className="text-sm text-muted-foreground">{percent ? "n/a" : "—"}</span>;
+   225→  }
+   226→  const raw = percent ? Math.round(value * 100) : Math.round(value);
+   227→  const clamped = Math.min(100, Math.max(0, raw));
+   228→  return (
+   229→    <div className="flex items-center gap-2">
+   230→      <span className={cn("w-10 shrink-0 text-right text-sm font-medium tabular-nums", scoreColor(value))}>
+   231→        {percent ? `${raw}%` : raw}
+   232→      </span>
+   233→      <Progress value={clamped} className="h-1 w-16 [&>div]:bg-emerald-500" />
+   234→    </div>
+   235→  );
+   236→}
+   237→
+   238→function SortButton({
+   239→  label,
+   240→  field,
+   241→  sort,
+   242→  order,
+   243→  onToggle,
+   244→}: {
+   245→  label: string;
+   246→  field: SortField;
+   247→  sort: SortField;
+   248→  order: SortOrder;
+   249→  onToggle: (field: SortField) => void;
+   250→}) {
+   251→  const active = sort === field;
+   252→  const Icon = !active ? ArrowUpDown : order === "asc" ? ArrowUp : ArrowDown;
+   253→  return (
+   254→    <button
+   255→      type="button"
+   256→      onClick={() => onToggle(field)}
+   257→      className={cn(
+   258→        "inline-flex h-8 items-center gap-1 rounded px-1 text-sm font-medium transition-colors",
+   259→        active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+   260→      )}
+   261→      aria-label={`Sort by ${label}`}
+   262→    >
+   263→      {label}
+   264→      <Icon className="size-3.5" aria-hidden="true" />
+   265→    </button>
+   266→  );
+   267→}
+   268→
+   269→// ── New / Edit lead dialog ───────────────────────────────────────────────────
+   270→
+   271→function LeadFormDialog({
+   272→  open,
+   273→  onOpenChange,
+   274→  lead,
+   275→  onSaved,
+   276→}: {
+   277→  open: boolean;
+   278→  onOpenChange: (open: boolean) => void;
+   279→  lead: LeadRowClient | null;
+   280→  onSaved: () => void;
+   281→}) {
+   282→  const [form, setForm] = useState<LeadFormValues>(EMPTY_FORM);
+   283→  const [saving, setSaving] = useState(false);
+   284→  const isEdit = lead !== null;
+   285→
+   286→  useEffect(() => {
+   287→    if (!open) return;
+   288→    if (lead) {
+   289→      setForm({
+   290→        companyName: lead.companyName ?? "",
+   291→        contactName: lead.contactName ?? "",
+   292→        industry: lead.industry ?? "",
+   293→        employeeCount: lead.employeeCount === null ? "" : String(lead.employeeCount),
+   294→        revenueBand: lead.revenueBand ?? "",
+   295→        country: lead.country ?? "",
+   296→        businessModel: lead.businessModel ?? "",
+   297→        email: lead.email ?? "",
+   298→        title: lead.title ?? "",
+   299→        phone: lead.phone ?? "",
+   300→        dealValue: lead.dealValue === null ? "" : String(lead.dealValue),
+   301→        source: lead.source ?? "",
+   302→      });
+   303→    } else {
+   304→      setForm(EMPTY_FORM);
+   305→    }
+   306→  }, [open, lead]);
+   307→
+   308→  function setField<K extends keyof LeadFormValues>(key: K, value: LeadFormValues[K]) {
+   309→    setForm((prev) => ({ ...prev, [key]: value }));
+   310→  }
+   311→
+   312→  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+   313→    event.preventDefault();
+   314→    if (!form.companyName.trim() || !form.contactName.trim()) {
+   315→      toast.error("Company name and contact name are required.");
+   316→      return;
+   317→    }
+   318→    setSaving(true);
+   319→    try {
+   320→      if (lead) {
+   321→        await api<{ ok: boolean; detail?: string }>(`/api/leads/${lead.id}`, {
+   322→          method: "PATCH",
+   323→          body: buildPatchPayload(form),
+   324→        });
+   325→        toast.success(`Lead updated — ${form.companyName.trim()}`);
+   326→      } else {
+   327→        await api<{ ok: boolean; leadId?: string }>("/api/leads", {
+   328→          method: "POST",
+   329→          body: buildCreatePayload(form),
+   330→        });
+   331→        toast.success(`Lead created — ${form.companyName.trim()}`);
+   332→      }
+   333→      onOpenChange(false);
+   334→      onSaved();
+   335→    } catch (err) {
+   336→      toast.error(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+   337→    } finally {
+   338→      setSaving(false);
+   339→    }
+   340→  }
+   341→
+   342→  return (
+   343→    <Dialog open={open} onOpenChange={onOpenChange}>
+   344→      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+   345→        <DialogHeader>
+   346→          <DialogTitle>{isEdit ? "Edit lead" : "New lead"}</DialogTitle>
+   347→          <DialogDescription>
+   348→            {isEdit
+   349→              ? `Update the details for ${lead?.companyName ?? "this lead"}.`
+   350→              : "Add a lead to the workspace. Company and contact names are required."}
+   351→          </DialogDescription>
+   352→        </DialogHeader>
+   353→        <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2" noValidate autoComplete="off">
+   354→          <div className="grid gap-2">
+   355→            <Label htmlFor="lm-lead-company">Company name *</Label>
+   356→            <Input
+   357→              id="lm-lead-company"
+   358→              value={form.companyName}
+   359→              onChange={(e) => setField("companyName", e.target.value)}
+   360→              disabled={isEdit}
+   361→              required
+   362→              aria-required="true"
+   363→            />
+   364→            {isEdit && <p className="text-xs text-muted-foreground">Company name cannot be changed after creation.</p>}
+   365→          </div>
+   366→          <div className="grid gap-2">
+   367→            <Label htmlFor="lm-lead-contact">Contact name *</Label>
+   368→            <Input
+   369→              id="lm-lead-contact"
+   370→              value={form.contactName}
+   371→              onChange={(e) => setField("contactName", e.target.value)}
+   372→              required
+   373→              aria-required="true"
+   374→            />
+   375→          </div>
+   376→          <div className="grid gap-2">
+   377→            <Label htmlFor="lm-lead-industry">Industry</Label>
+   378→            <Input
+   379→              id="lm-lead-industry"
+   380→              value={form.industry}
+   381→              onChange={(e) => setField("industry", e.target.value)}
+   382→              placeholder="e.g. SaaS, FinTech, Healthcare IT"
+   383→            />
+   384→          </div>
+   385→          <div className="grid gap-2">
+   386→            <Label htmlFor="lm-lead-employees">Employees</Label>
+   387→            <Input
+   388→              id="lm-lead-employees"
+   389→              type="number"
+   390→              min={0}
+   391→              step={1}
+   392→              inputMode="numeric"
+   393→              value={form.employeeCount}
+   394→              onChange={(e) => setField("employeeCount", e.target.value)}
+   395→              placeholder="e.g. 250"
+   396→            />
+   397→          </div>
+   398→          <div className="grid gap-2">
+   399→            <Label htmlFor="lm-lead-revenue">Revenue band</Label>
+   400→            <Select
+   401→              value={form.revenueBand || UNSET}
+   402→              onValueChange={(v) => setField("revenueBand", v === UNSET ? "" : v)}
+   403→            >
+   404→              <SelectTrigger id="lm-lead-revenue" aria-label="Revenue band">
+   405→                <SelectValue placeholder="Select revenue band" />
+   406→              </SelectTrigger>
+   407→              <SelectContent>
+   408→                <SelectItem value={UNSET}>Not set</SelectItem>
+   409→                {REVENUE_BANDS.map((band) => (
+   410→                  <SelectItem key={band} value={band}>
+   411→                    {band}
+   412→                  </SelectItem>
+   413→                ))}
+   414→              </SelectContent>
+   415→            </Select>
+   416→          </div>
+   417→          <div className="grid gap-2">
+   418→            <Label htmlFor="lm-lead-country">Country</Label>
+   419→            <Input
+   420→              id="lm-lead-country"
+   421→              value={form.country}
+   422→              onChange={(e) => setField("country", e.target.value)}
+   423→              placeholder="e.g. United States"
+   424→            />
+   425→          </div>
+   426→          <div className="grid gap-2">
+   427→            <Label htmlFor="lm-lead-model">Business model</Label>
+   428→            <Select
+   429→              value={form.businessModel || UNSET}
+   430→              onValueChange={(v) => setField("businessModel", v === UNSET ? "" : v)}
+   431→            >
+   432→              <SelectTrigger id="lm-lead-model" aria-label="Business model">
+   433→                <SelectValue placeholder="Select business model" />
+   434→              </SelectTrigger>
+   435→              <SelectContent>
+   436→                <SelectItem value={UNSET}>Not set</SelectItem>
+   437→                {BUSINESS_MODELS.map((model) => (
+   438→                  <SelectItem key={model.value} value={model.value}>
+   439→                    {model.label}
+   440→                  </SelectItem>
+   441→                ))}
+   442→              </SelectContent>
+   443→            </Select>
+   444→          </div>
+   445→          <div className="grid gap-2">
+   446→            <Label htmlFor="lm-lead-email">Email</Label>
+   447→            <Input
+   448→              id="lm-lead-email"
+   449→              type="email"
+   450→              value={form.email}
+   451→              onChange={(e) => setField("email", e.target.value)}
+   452→              placeholder="name@company.com"
+   453→            />
+   454→          </div>
+   455→          <div className="grid gap-2">
+   456→            <Label htmlFor="lm-lead-title">Title</Label>
+   457→            <Input
+   458→              id="lm-lead-title"
+   459→              value={form.title}
+   460→              onChange={(e) => setField("title", e.target.value)}
+   461→              placeholder="e.g. VP of Engineering"
+   462→            />
+   463→          </div>
+   464→          <div className="grid gap-2">
+   465→            <Label htmlFor="lm-lead-phone">Phone</Label>
+   466→            <Input
+   467→              id="lm-lead-phone"
+   468→              type="tel"
+   469→              value={form.phone}
+   470→              onChange={(e) => setField("phone", e.target.value)}
+   471→              placeholder="e.g. +1 555 000 1234"
+   472→            />
+   473→          </div>
+   474→          <div className="grid gap-2">
+   475→            <Label htmlFor="lm-lead-deal">Deal value</Label>
+   476→            <Input
+   477→              id="lm-lead-deal"
+   478→              type="number"
+   479→              min={0}
+   480→              step="any"
+   481→              inputMode="decimal"
+   482→              value={form.dealValue}
+   483→              onChange={(e) => setField("dealValue", e.target.value)}
+   484→              placeholder="e.g. 25000"
+   485→            />
+   486→          </div>
+   487→          <div className="grid gap-2">
+   488→            <Label htmlFor="lm-lead-source">Source</Label>
+   489→            <Select value={form.source || UNSET} onValueChange={(v) => setField("source", v === UNSET ? "" : v)}>
+   490→              <SelectTrigger id="lm-lead-source" aria-label="Source">
+   491→                <SelectValue placeholder="Select source" />
+   492→              </SelectTrigger>
+   493→              <SelectContent>
+   494→                <SelectItem value={UNSET}>Not set</SelectItem>
+   495→                {SOURCES.map((source) => (
+   496→                  <SelectItem key={source.value} value={source.value}>
+   497→                    {source.label}
+   498→                  </SelectItem>
+   499→                ))}
+   500→              </SelectContent>
+   501→            </Select>
+   502→          </div>
+   503→          <DialogFooter className="mt-2 sm:col-span-2">
+   504→            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+   505→              Cancel
+   506→            </Button>
+   507→            <Button type="submit" disabled={saving}>
+   508→              {saving ? "Saving..." : isEdit ? "Save changes" : "Create lead"}
+   509→            </Button>
+   510→          </DialogFooter>
+   511→        </form>
+   512→      </DialogContent>
+   513→    </Dialog>
+   514→  );
+   515→}
+   516→
+   517→// ── Import dialog ────────────────────────────────────────────────────────────
+   518→
+   519→function ImportDialog({
+   520→  open,
+   521→  onOpenChange,
+   522→  onImported,
+   523→}: {
+   524→  open: boolean;
+   525→  onOpenChange: (open: boolean) => void;
+   526→  onImported: () => void;
+   527→}) {
+   528→  const [csv, setCsv] = useState("");
+   529→  const [importing, setImporting] = useState(false);
+   530→  const [result, setResult] = useState<ImportResult | null>(null);
+   531→  const fileInputRef = useRef<HTMLInputElement>(null);
+   532→
+   533→  useEffect(() => {
+   534→    if (open) setResult(null);
+   535→  }, [open]);
+   536→
+   537→  function handleFile(event: ChangeEvent<HTMLInputElement>) {
+   538→    const file = event.target.files?.[0];
+   539→    if (!file) return;
+   540→    const reader = new FileReader();
+   541→    reader.onload = () => {
+   542→      setCsv(typeof reader.result === "string" ? reader.result : "");
+   543→      toast.success(`Loaded ${file.name}`);
+   544→    };
+   545→    reader.onerror = () => toast.error("Could not read the selected file.");
+   546→    reader.readAsText(file);
+   547→    event.target.value = "";
+   548→  }
+   549→
+   550→  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+   551→    event.preventDefault();
+   552→    if (!csv.trim()) {
+   553→      toast.error("Paste CSV content or choose a file first.");
+   554→      return;
+   555→    }
+   556→    setImporting(true);
+   557→    try {
+   558→      const res = await api<ImportResult>("/api/leads/import", { method: "POST", body: { csv } });
+   559→      setResult(res);
+   560→      if (res.created > 0) {
+   561→        toast.success(
+   562→          `Imported ${res.created} lead${res.created === 1 ? "" : "s"}${res.skipped ? `, skipped ${res.skipped}` : ""}.`,
+   563→        );
+   564→      } else {
+   565→        toast.warning(`No leads imported${res.skipped ? ` — ${res.skipped} skipped` : ""}.`);
+   566→      }
+   567→      if (res.errors && res.errors.length > 0) {
+   568→        toast.warning(`${res.errors.length} row${res.errors.length === 1 ? "" : "s"} reported errors — see details.`);
+   569→      }
+   570→      onImported();
+   571→      if (res.created > 0) setCsv("");
+   572→    } catch (err) {
+   573→      toast.error(err instanceof Error ? err.message : "Import failed. Please try again.");
+   574→    } finally {
+   575→      setImporting(false);
+   576→    }
+   577→  }
+   578→
+   579→  return (
+   580→    <Dialog open={open} onOpenChange={onOpenChange}>
+   581→      <DialogContent className="sm:max-w-xl">
+   582→        <DialogHeader>
+   583→          <DialogTitle>Import leads from CSV</DialogTitle>
+   584→          <DialogDescription>
+   585→            Paste CSV content or upload a file. One lead per row with a header row first.
+   586→          </DialogDescription>
+   587→        </DialogHeader>
+   588→        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+   589→          <div className="space-y-2">
+   590→            <Label htmlFor="lm-import-csv">CSV content</Label>
+   591→            <Textarea
+   592→              id="lm-import-csv"
+   593→              value={csv}
+   594→              onChange={(e) => setCsv(e.target.value)}
+   595→              rows={8}
+   596→              className="font-mono text-xs"
+   597→              placeholder={CSV_SAMPLE_HEADER}
+   598→            />
+   599→            <p className="rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+   600→              Expected columns: <span className="font-mono">{CSV_SAMPLE_HEADER}</span>
+   601→            </p>
+   602→          </div>
+   603→          <div className="flex flex-wrap items-center gap-3">
+   604→            <input
+   605→              ref={fileInputRef}
+   606→              type="file"
+   607→              id="lm-import-file"
+   608→              accept=".csv,text/csv,text/plain"
+   609→              className="sr-only"
+   610→              aria-label="Choose CSV file"
+   611→              onChange={handleFile}
+   612→            />
+   613→            <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
+   614→              <FileUp className="size-4" aria-hidden="true" />
+   615→              Choose file
+   616→            </Button>
+   617→            {result && (
+   618→              <p className="text-xs text-muted-foreground">
+   619→                Created {result.created} · Skipped {result.skipped}
+   620→              </p>
+   621→            )}
+   622→          </div>
+   623→          {result && result.errors.length > 0 && (
+   624→            <Alert variant="destructive">
+   625→              <TriangleAlert className="size-4" />
+   626→              <AlertTitle>{result.errors.length} row(s) were skipped</AlertTitle>
+   627→              <AlertDescription>
+   628→                <ul className="mt-1 max-h-32 list-disc space-y-0.5 overflow-y-auto pl-4 text-xs">
+   629→                  {result.errors.map((err, i) => (
+   630→                    <li key={i}>{err}</li>
+   631→                  ))}
+   632→                </ul>
+   633→              </AlertDescription>
+   634→            </Alert>
+   635→          )}
+   636→          <DialogFooter>
+   637→            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={importing}>
+   638→              Cancel
+   639→            </Button>
+   640→            <Button type="submit" disabled={importing || !csv.trim()}>
+   641→              {importing ? "Importing..." : "Import leads"}
+   642→            </Button>
+   643→          </DialogFooter>
+   644→        </form>
+   645→      </DialogContent>
+   646→    </Dialog>
+   647→  );
+   648→}
+   649→
+   650→// ── Main view ────────────────────────────────────────────────────────────────
+   651→
+   652→export function LeadsView({ session }: { session: SessionData }) {
+   653→  const navigate = useAppStore((s) => s.navigate);
+   654→
+   655→  const [searchInput, setSearchInput] = useState("");
+   656→  const [searchQuery, setSearchQuery] = useState("");
+   657→  const [industry, setIndustry] = useState("ALL");
+   658→  const [qualification, setQualification] = useState("ALL");
+   659→  const [sort, setSort] = useState<SortField>("recent");
+   660→  const [order, setOrder] = useState<SortOrder>("desc");
+   661→  const [page, setPage] = useState(1);
+   662→
+   663→  const [items, setItems] = useState<LeadRowClient[]>([]);
+   664→  const [total, setTotal] = useState(0);
+   665→  const [industries, setIndustries] = useState<string[]>([]);
+   666→  const [loading, setLoading] = useState(true);
+   667→  const [error, setError] = useState<string | null>(null);
+   668→
+   669→  const [formOpen, setFormOpen] = useState(false);
+   670→  const [editLead, setEditLead] = useState<LeadRowClient | null>(null);
+   671→  const [importOpen, setImportOpen] = useState(false);
+   672→
+   673→  const reqIdRef = useRef(0);
+   674→
+   675→  // Debounce free-text search (350ms, no external deps).
+   676→  useEffect(() => {
+   677→    const timer = setTimeout(() => setSearchQuery(searchInput), SEARCH_DEBOUNCE_MS);
+   678→    return () => clearTimeout(timer);
+   679→  }, [searchInput]);
+   680→
+   681→  // Any filter or sort change resets pagination.
+   682→  useEffect(() => {
+   683→    setPage(1);
+   684→  }, [searchQuery, industry, qualification, sort, order]);
+   685→
+   686→  const load = useCallback(async () => {
+   687→    const reqId = ++reqIdRef.current;
+   688→    setLoading(true);
+   689→    setError(null);
+   690→    const params = new URLSearchParams();
+   691→    if (searchQuery.trim()) params.set("query", searchQuery.trim());
+   692→    if (industry !== "ALL") params.set("industry", industry);
+   693→    if (qualification !== "ALL") params.set("qualification", qualification);
+   694→    params.set("sort", sort);
+   695→    params.set("order", order);
+   696→    params.set("page", String(page));
+   697→    params.set("pageSize", String(PAGE_SIZE));
+   698→    try {
+   699→      const res = await api<LeadsResponse>(`/api/leads?${params.toString()}`);
+   700→      if (reqId !== reqIdRef.current) return;
+   701→      setItems(res.items ?? []);
+   702→      setTotal(res.total ?? 0);
+   703→      if (res.facets && Array.isArray(res.facets.industries)) setIndustries(res.facets.industries);
+   704→    } catch (err) {
+   705→      if (reqId !== reqIdRef.current) return;
+   706→      setError(err instanceof Error ? err.message : "Failed to load leads.");
+   707→    } finally {
+   708→      if (reqId === reqIdRef.current) setLoading(false);
+   709→    }
+   710→  }, [searchQuery, industry, qualification, sort, order, page]);
+   711→
+   712→  useEffect(() => {
+   713→    void load();
+   714→  }, [load]);
+   715→
+   716→  const toggleSort = useCallback(
+   717→    (field: SortField) => {
+   718→      if (field === sort) {
+   719→        setOrder((prev) => (prev === "desc" ? "asc" : "desc"));
+   720→      } else {
+   721→        setSort(field);
+   722→        setOrder("desc");
+   723→      }
+   724→    },
+   725→    [sort],
+   726→  );
+   727→
+   728→  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+   729→
+   730→  return (
+   731→    <div className="space-y-6">
+   732→      <PageHeader
+   733→        title="Lead Universe"
+   734→        description="Search, filter and manage every lead in the workspace"
+   735→        actions={
+   736→          <>
+   737→            <Button variant="outline" onClick={() => setImportOpen(true)}>
+   738→              <Upload className="size-4" aria-hidden="true" />
+   739→              Import CSV
+   740→            </Button>
+   741→            <Button variant="outline" asChild>
+   742→              <a href="/api/leads/export">
+   743→                <Download className="size-4" aria-hidden="true" />
+   744→                Export
+   745→              </a>
+   746→            </Button>
+   747→            <Button
+   748→              onClick={() => {
+   749→                setEditLead(null);
+   750→                setFormOpen(true);
+   751→              }}
+   752→            >
+   753→              <Plus className="size-4" aria-hidden="true" />
+   754→              New lead
+   755→            </Button>
+   756→          </>
+   757→        }
+   758→      />
+   759→
+   760→      {/* Filter bar */}
+   761→      <div className="flex flex-wrap items-center gap-2" role="search" aria-label="Lead filters">
+   762→        <div className="relative w-full sm:w-64">
+   763→          <Search
+   764→            className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+   765→            aria-hidden="true"
+   766→          />
+   767→          <Input
+   768→            id="lm-lead-search"
+   769→            type="search"
+   770→            value={searchInput}
+   771→            onChange={(e) => setSearchInput(e.target.value)}
+   772→            placeholder="Search company, contact, email..."
+   773→            className="pl-8"
+   774→            aria-label="Search leads"
+   775→          />
+   776→        </div>
+   777→        <Select
+   778→          value={industry}
+   779→          onValueChange={(v) => {
+   780→            setIndustry(v);
+   781→          }}
+   782→        >
+   783→          <SelectTrigger className="w-full sm:w-44" aria-label="Filter by industry">
+   784→            <SelectValue placeholder="All industries" />
+   785→          </SelectTrigger>
+   786→          <SelectContent>
+   787→            <SelectItem value="ALL">All industries</SelectItem>
+   788→            {industries.map((ind) => (
+   789→              <SelectItem key={ind} value={ind}>
+   790→                {ind}
+   791→              </SelectItem>
+   792→            ))}
+   793→          </SelectContent>
+   794→        </Select>
+   795→        <Select
+   796→          value={qualification}
+   797→          onValueChange={(v) => {
+   798→            setQualification(v);
+   799→          }}
+   800→        >
+   801→          <SelectTrigger className="w-full sm:w-48" aria-label="Filter by qualification">
+   802→            <SelectValue placeholder="All qualifications" />
+   803→          </SelectTrigger>
+   804→          <SelectContent>
+   805→            <SelectItem value="ALL">All qualifications</SelectItem>
+   806→            {QUALIFICATIONS.map((q) => (
+   807→              <SelectItem key={q} value={q}>
+   808→                {qualLabel(q)}
+   809→              </SelectItem>
+   810→            ))}
+   811→          </SelectContent>
+   812→        </Select>
+   813→        <Select
+   814→          value={sort}
+   815→          onValueChange={(v) => {
+   816→            setSort(v as SortField);
+   817→          }}
+   818→        >
+   819→          <SelectTrigger className="w-full sm:w-44" aria-label="Sort leads">
+   820→            <SelectValue placeholder="Sort" />
+   821→          </SelectTrigger>
+   822→          <SelectContent>
+   823→            {SORT_FIELDS.map((s) => (
+   824→              <SelectItem key={s.value} value={s.value}>
+   825→                {s.label}
+   826→              </SelectItem>
+   827→            ))}
+   828→          </SelectContent>
+   829→        </Select>
+   830→      </div>
+   831→
+   832→      {/* Table */}
+   833→      <Card className="gap-0 overflow-hidden p-0">
+   834→        <CardContent className="p-0">
+   835→          {error && (
+   836→            <div className="p-4">
+   837→              <Alert variant="destructive">
+   838→                <TriangleAlert className="size-4" />
+   839→                <AlertTitle>Failed to load leads</AlertTitle>
+   840→                <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+   841→                  <span>{error}</span>
+   842→                  <Button variant="outline" onClick={() => void load()}>
+   843→                    <RefreshCw className="size-4" aria-hidden="true" />
+   844→                    Retry
+   845→                  </Button>
+   846→                </AlertDescription>
+   847→              </Alert>
+   848→            </div>
+   849→          )}
+   850→          <div className="overflow-x-auto" aria-busy={loading}>
+   851→            <Table className="min-w-[920px]">
+   852→              <TableHeader>
+   853→                <TableRow className="hover:bg-transparent">
+   854→                  <TableHead>Company</TableHead>
+   855→                  <TableHead>Industry</TableHead>
+   856→                  <TableHead>
+   857→                    <SortButton label="Fit" field="fit" sort={sort} order={order} onToggle={toggleSort} />
+   858→                  </TableHead>
+   859→                  <TableHead>
+   860→                    <SortButton label="Intent" field="intent" sort={sort} order={order} onToggle={toggleSort} />
+   861→                  </TableHead>
+   862→                  <TableHead>
+   863→                    <SortButton label="Conv. %" field="probability" sort={sort} order={order} onToggle={toggleSort} />
+   864→                  </TableHead>
+   865→                  <TableHead>Qualification</TableHead>
+   866→                  <TableHead>
+   867→                    <SortButton label="Deal value" field="dealValue" sort={sort} order={order} onToggle={toggleSort} />
+   868→                  </TableHead>
+   869→                  <TableHead>Last event</TableHead>
+   870→                  <TableHead className="w-12">
+   871→                    <span className="sr-only">Actions</span>
+   872→                  </TableHead>
+   873→                </TableRow>
+   874→              </TableHeader>
+   875→              <TableBody>
+   876→                {loading ? (
+   877→                  Array.from({ length: 8 }).map((_, i) => (
+   878→                    <TableRow key={`skeleton-${i}`} className="hover:bg-transparent">
+   879→                      <TableCell colSpan={9} className="py-2">
+   880→                        <Skeleton className="h-8 w-full" />
+   881→                      </TableCell>
+   882→                    </TableRow>
+   883→                  ))
+   884→                ) : items.length === 0 ? (
+   885→                  <TableRow className="hover:bg-transparent">
+   886→                    <TableCell colSpan={9}>
+   887→                      <EmptyState
+   888→                        title="No leads match your filters"
+   889→                        description="Try adjusting the search or clearing a filter, or add a new lead."
+   890→                        icon={<Users className="size-8" aria-hidden="true" />}
+   891→                      />
+   892→                    </TableCell>
+   893→                  </TableRow>
+   894→                ) : (
+   895→                  items.map((lead) => (
+   896→                    <TableRow
+   897→                      key={lead.id}
+   898→                      className="cursor-pointer"
+   899→                      onClick={() => navigate("lead", { leadId: lead.id })}
+   900→                    >
+   901→                      <TableCell>
+   902→                        <p className="font-medium">{lead.companyName}</p>
+   903→                        <p className="text-xs text-muted-foreground">
+   904→                          {lead.contactName}
+   905→                          {lead.title ? ` · ${lead.title}` : ""}
+   906→                        </p>
+   907→                      </TableCell>
+   908→                      <TableCell className="text-sm text-muted-foreground">{lead.industry ?? "—"}</TableCell>
+   909→                      <TableCell>
+   910→                        <ScoreCell value={lead.fit} />
+   911→                      </TableCell>
+   912→                      <TableCell>
+   913→                        <ScoreCell value={lead.intent} />
+   914→                      </TableCell>
+   915→                      <TableCell>
+   916→                        <ScoreCell value={lead.probability} percent />
+   917→                      </TableCell>
+   918→                      <TableCell>
+   919→                        <QualBadge
+   920→                          category={lead.qualification?.category ?? null}
+   921→                          source={lead.qualification?.source}
+   922→                        />
+   923→                      </TableCell>
+   924→                      <TableCell className="text-sm tabular-nums">{fmtMoney(lead.dealValue)}</TableCell>
+   925→                      <TableCell className="text-sm text-muted-foreground">{fmtRelative(lead.lastEventAt)}</TableCell>
+   926→                      <TableCell onClick={(e) => e.stopPropagation()}>
+   927→                        <DropdownMenu>
+   928→                          <DropdownMenuTrigger asChild>
+   929→                            <Button
+   930→                              variant="ghost"
+   931→                              size="icon"
+   932→                              aria-label={`Actions for ${lead.companyName}`}
+   933→                            >
+   934→                              <MoreHorizontal className="size-4" aria-hidden="true" />
+   935→                            </Button>
+   936→                          </DropdownMenuTrigger>
+   937→                          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+   938→                            <DropdownMenuItem onSelect={() => navigate("lead", { leadId: lead.id })}>
+   939→                              <Eye className="size-4" aria-hidden="true" />
+   940→                              View profile
+   941→                            </DropdownMenuItem>
+   942→                            <DropdownMenuItem
+   943→                              onSelect={() => {
+   944→                                setEditLead(lead);
+   945→                                setFormOpen(true);
+   946→                              }}
+   947→                            >
+   948→                              <Pencil className="size-4" aria-hidden="true" />
+   949→                              Edit
+   950→                            </DropdownMenuItem>
+   951→                            <DropdownMenuSeparator />
+   952→                            <DropdownMenuItem onSelect={() => navigate("copilot", { leadContextId: lead.id })}>
+   953→                              <Sparkles className="size-4" aria-hidden="true" />
+   954→                              Ask Copilot
+   955→                            </DropdownMenuItem>
+   956→                          </DropdownMenuContent>
+   957→                        </DropdownMenu>
+   958→                      </TableCell>
+   959→                    </TableRow>
+   960→                  ))
+   961→                )}
+   962→              </TableBody>
+   963→            </Table>
+   964→          </div>
+   965→
+   966→          {/* Pagination footer */}
+   967→          <div className="flex items-center justify-between border-t px-4 py-3">
+   968→            <p className="text-sm text-muted-foreground">
+   969→              {total} {total === 1 ? "lead" : "leads"} · page {page} of {totalPages}
+   970→            </p>
+   971→            <div className="flex items-center gap-2">
+   972→              <Button
+   973→                variant="outline"
+   974→                disabled={page <= 1 || loading}
+   975→                onClick={() => setPage((p) => Math.max(1, p - 1))}
+   976→                aria-label="Previous page"
+   977→              >
+   978→                <ChevronLeft className="size-4" aria-hidden="true" />
+   979→                Prev
+   980→              </Button>
+   981→              <Button
+   982→                variant="outline"
+   983→                disabled={page >= totalPages || loading}
+   984→                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+   985→                aria-label="Next page"
+   986→              >
+   987→                Next
+   988→                <ChevronRight className="size-4" aria-hidden="true" />
+   989→              </Button>
+   990→            </div>
+   991→          </div>
+   992→        </CardContent>
+   993→      </Card>
+   994→
+   995→      <LeadFormDialog
+   996→        open={formOpen}
+   997→        onOpenChange={setFormOpen}
+   998→        lead={editLead}
+   999→        onSaved={() => void load()}
+  1000→      />
+  1001→      <ImportDialog open={importOpen} onOpenChange={setImportOpen} onImported={() => void load()} />
+  1002→    </div>
+  1003→  );
+  1004→}
+  1005→

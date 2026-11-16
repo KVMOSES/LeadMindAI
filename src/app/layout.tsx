@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   keywords: ["LeadMind", "sales intelligence", "lead scoring", "AI copilot", "conversion prediction"],
   icons: {
     icon: "data:image/svg+xml," + encodeURIComponent(
-      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#0c0f14"/><path d="M9 22V10h3v9h7v3H9z" fill="#10b981"/><circle cx="23" cy="12" r="3" fill="#10b981"/></svg>'
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#0b0d12"/><path d="M9 22V10h3v9h7v3H9z" fill="#8b7cf6"/><circle cx="23" cy="12" r="3" fill="#7dd3fc"/></svg>'
     ),
   },
 };

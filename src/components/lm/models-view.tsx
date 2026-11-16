@@ -48,6 +48,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { api, fmtDate, fmtDateTime } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { EmptyState, PageHeader, StatCard } from "@/components/lm/shared";
+import { MetalButton } from "@/components/ui/metal-button";
 import type { SessionData } from "@/lib/store";
 
 // ── API payload interfaces ───────────────────────────────────────────────────
@@ -432,7 +433,7 @@ function FeatureImportanceChart({ rows }: { rows: FeatureImportanceRow[] }) {
             contentStyle={CHART_TOOLTIP}
             formatter={(v) => [typeof v === "number" ? v.toFixed(4) : String(v), "Importance"]}
           />
-          <Bar dataKey="importance" fill="#10b981" radius={[0, 4, 4, 0]} barSize={14} />
+          <Bar dataKey="importance" fill="#8b7cf6" radius={[0, 4, 4, 0]} barSize={14} />
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -567,15 +568,16 @@ export function ModelsView({ session }: { session: SessionData }) {
   }, [activateTarget, load]);
 
   const trainButton = (
-    <Button onClick={() => void train()} disabled={training} size="sm">
+    <MetalButton variant="gold" onClick={() => void train()} disabled={training} size="sm">
       {training ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <BrainCircuit className="h-4 w-4" aria-hidden />}
       {training ? "Training…" : "Train models"}
-    </Button>
+    </MetalButton>
   );
 
   return (
     <div className="space-y-6">
       <PageHeader
+        eyebrow="Model Ops"
         title="Model Intelligence"
         description="Train, compare and monitor the conversion models behind LeadMind's predictions."
       />
@@ -640,7 +642,7 @@ export function ModelsView({ session }: { session: SessionData }) {
                   </Alert>
                 ) : (
                   <Alert>
-                    <Info className="h-4 w-4 text-emerald-600 dark:text-emerald-400" aria-hidden />
+                    <Info className="h-4 w-4 text-[var(--lm-brand)]" aria-hidden />
                     <AlertTitle>Dataset provenance</AlertTitle>
                     <AlertDescription>
                       Trained on {production.trainInfo.realOutcomeRows} verified real outcome rows with{" "}

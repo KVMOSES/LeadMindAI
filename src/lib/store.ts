@@ -6,11 +6,14 @@ export type ViewKey =
   | "dashboard"
   | "leads"
   | "lead"
+  | "profiles"
+  | "qualification"
   | "copilot"
   | "actions"
   | "models"
   | "explainability"
   | "feedback"
+  | "monitoring"
   | "settings";
 
 export interface SessionData {
@@ -51,7 +54,7 @@ export function parseHash(hash: string): { view: ViewKey; leadId?: string; conve
   const [head, id] = parts;
   if (head === "leads" && id) return { view: "lead", leadId: id };
   if (head === "copilot") return { view: "copilot", conversationId: id };
-  const known: ViewKey[] = ["dashboard", "leads", "copilot", "actions", "models", "explainability", "feedback", "settings"];
+  const known: ViewKey[] = ["dashboard", "leads", "profiles", "qualification", "copilot", "actions", "models", "explainability", "feedback", "monitoring", "settings"];
   return { view: known.includes(head as ViewKey) ? (head as ViewKey) : "dashboard" };
 }
 

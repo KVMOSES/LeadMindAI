@@ -58,6 +58,8 @@ interface HistoryPoint {
 }
 
 const CHART_TOOLTIP = { background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 } as const;
+const BRAND = "#8b7cf6";
+const INFO = "#7fb5fa";
 
 function decisionBadgeClass(decision: string): string {
   return decision === "WILL_CONVERT"
@@ -165,6 +167,7 @@ export function ExplainabilityView({ session: _session }: { session: SessionData
   return (
     <div className="space-y-6">
       <PageHeader
+        eyebrow="Model Ops"
         title="Explainability Studio"
         description="Understand why each lead scored the way it did — factor breakdowns, model drivers and score history."
         actions={
@@ -403,8 +406,8 @@ export function ExplainabilityView({ session: _session }: { session: SessionData
                       <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" width={32} />
                       <ChartTooltip contentStyle={CHART_TOOLTIP} />
                       <Legend iconType="plainline" wrapperStyle={{ fontSize: 12 }} />
-                      <Line type="monotone" dataKey="fit" name="Fit score" stroke="#10b981" strokeWidth={2} dot={false} connectNulls />
-                      <Line type="monotone" dataKey="prob" name="Conversion %" stroke="#f59e0b" strokeWidth={2} dot={false} connectNulls />
+                      <Line type="monotone" dataKey="fit" name="Fit score" stroke={BRAND} strokeWidth={2} dot={false} connectNulls />
+                      <Line type="monotone" dataKey="prob" name="Conversion %" stroke={INFO} strokeWidth={2} dot={false} connectNulls />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
