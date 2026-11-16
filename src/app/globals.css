@@ -6,8 +6,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, "SFMono-Regular", monospace;
+  --font-display: var(--font-space-grotesk), var(--font-jakarta), ui-sans-serif, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -44,58 +45,77 @@
 }
 
 /* ── LeadMind AI design tokens ──────────────────────────────────────────────
-   Dark-first. Midnight charcoal base, graphite surfaces, restrained electric
-   violet brand accent, subtle blue secondary, emerald/amber/rose reserved
-   for semantic success / warning / critical states.                          */
+   Dark-first. Midnight charcoal base, graphite surfaces, electric violet
+   brand, cobalt secondary, controlled lime signal accent. Emerald / amber /
+   rose reserved strictly for semantic success / warning / critical states.
+
+   Spacing system: strict 4px scale via Tailwind utilities —
+     page gutter      px-4 · sm:px-6 · lg:px-8   (16 / 24 / 32)
+     page rhythm      py-5 sm:py-6               (20 / 24)
+     section gap      gap-5 · space-y-5          (20)
+     component gap    gap-4                      (16)
+     inner gap        gap-3 · gap-2              (12 / 8)
+     card padding     p-4 standard · p-5 hero    (16 / 20)
+     table cells      px-3 py-2.5                (12 / 10)                  */
 
 :root {
   --radius: 0.625rem;
 
+  /* Motion tokens */
+  --lm-fast: 150ms;
+  --lm-med: 220ms;
+  --lm-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
   /* Light theme */
-  --background: oklch(0.978 0.002 270);
-  --foreground: oklch(0.21 0.02 265);
+  --background: oklch(0.977 0.003 270);
+  --foreground: oklch(0.205 0.02 265);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.21 0.02 265);
+  --card-foreground: oklch(0.205 0.02 265);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.21 0.02 265);
-  --primary: oklch(0.545 0.19 288);
+  --popover-foreground: oklch(0.205 0.02 265);
+  --primary: oklch(0.545 0.21 288);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.955 0.004 270);
   --secondary-foreground: oklch(0.28 0.02 265);
   --muted: oklch(0.955 0.004 270);
   --muted-foreground: oklch(0.5 0.015 265);
-  --accent: oklch(0.952 0.014 288);
-  --accent-foreground: oklch(0.42 0.14 288);
+  --accent: oklch(0.95 0.02 288);
+  --accent-foreground: oklch(0.42 0.16 288);
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.912 0.006 270);
   --input: oklch(0.9 0.006 270);
-  --ring: oklch(0.545 0.19 288 / 45%);
-  --chart-1: oklch(0.545 0.19 288);
-  --chart-2: oklch(0.6 0.13 250);
+  --ring: oklch(0.545 0.21 288 / 45%);
+  --chart-1: oklch(0.545 0.21 288);
+  --chart-2: oklch(0.55 0.16 250);
   --chart-3: oklch(0.596 0.145 163.225);
   --chart-4: oklch(0.769 0.188 70.08);
   --chart-5: oklch(0.556 0 0);
   --sidebar: oklch(0.145 0.012 265);
   --sidebar-foreground: oklch(0.92 0.006 270);
-  --sidebar-primary: oklch(0.665 0.16 288);
+  --sidebar-primary: oklch(0.665 0.18 288);
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(1 0 0 / 6%);
   --sidebar-accent-foreground: oklch(0.95 0.005 270);
   --sidebar-border: oklch(1 0 0 / 8%);
-  --sidebar-ring: oklch(0.545 0.19 288 / 50%);
+  --sidebar-ring: oklch(0.545 0.21 288 / 50%);
 
   /* LeadMind brand layer (light) */
   --lm-sidebar: oklch(0.155 0.014 265);
   --lm-sidebar-hover: oklch(1 0 0 / 6%);
-  --lm-brand: oklch(0.545 0.19 288);           /* electric violet */
-  --lm-brand-soft: oklch(0.545 0.19 288 / 0.12);
-  --lm-info: oklch(0.6 0.13 250);              /* subtle blue */
-  --lm-info-soft: oklch(0.6 0.13 250 / 0.12);
-  --lm-success: oklch(0.596 0.145 163.225);    /* emerald — positive states only */
-  --lm-warning: oklch(0.666 0.179 58);         /* amber */
-  --lm-danger: oklch(0.645 0.246 16.439);      /* rose */
+  --lm-brand: oklch(0.545 0.21 288);            /* electric violet */
+  --lm-brand-soft: oklch(0.545 0.21 288 / 0.10);
+  --lm-info: oklch(0.55 0.16 250);              /* cobalt */
+  --lm-info-soft: oklch(0.55 0.16 250 / 0.10);
+  --lm-lime: oklch(0.72 0.19 130);              /* signal lime (AA on light) */
+  --lm-lime-soft: oklch(0.72 0.19 130 / 0.12);
+  --lm-success: oklch(0.596 0.145 163.225);     /* emerald — positive states only */
+  --lm-warning: oklch(0.666 0.179 58);          /* amber */
+  --lm-danger: oklch(0.645 0.246 16.439);       /* rose */
   --lm-elevated: oklch(1 0 0);
   --lm-hairline: oklch(0.21 0.02 265 / 10%);
+  --lm-grid-dot: oklch(0.545 0.21 288 / 14%);
+  --lm-shadow: 0 1px 2px oklch(0.21 0.02 265 / 8%), 0 10px 28px -14px oklch(0.21 0.02 265 / 22%);
+  --lm-shadow-hover: 0 2px 6px oklch(0.21 0.02 265 / 10%), 0 16px 36px -14px oklch(0.45 0.1 288 / 30%);
 }
 
 .dark {
@@ -106,7 +126,7 @@
   --card-foreground: oklch(0.955 0.006 265);
   --popover: oklch(0.215 0.017 265);
   --popover-foreground: oklch(0.955 0.006 265);
-  --primary: oklch(0.68 0.155 288);
+  --primary: oklch(0.72 0.17 288);
   --primary-foreground: oklch(0.16 0.03 288);
   --secondary: oklch(0.245 0.016 265);
   --secondary-foreground: oklch(0.93 0.006 265);
@@ -117,38 +137,46 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 8%);
   --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.68 0.155 288 / 50%);
-  --chart-1: oklch(0.68 0.155 288);
-  --chart-2: oklch(0.68 0.12 250);
+  --ring: oklch(0.72 0.17 288 / 50%);
+  --chart-1: oklch(0.72 0.17 288);
+  --chart-2: oklch(0.72 0.14 250);
   --chart-3: oklch(0.696 0.17 162.48);
   --chart-4: oklch(0.79 0.15 70.08);
   --chart-5: oklch(0.556 0 0);
   --sidebar: oklch(0.138 0.014 265);
   --sidebar-foreground: oklch(0.92 0.008 265);
-  --sidebar-primary: oklch(0.72 0.15 288);
+  --sidebar-primary: oklch(0.72 0.17 288);
   --sidebar-primary-foreground: oklch(0.16 0.03 288);
   --sidebar-accent: oklch(1 0 0 / 7%);
   --sidebar-accent-foreground: oklch(0.95 0.006 265);
   --sidebar-border: oklch(1 0 0 / 7%);
-  --sidebar-ring: oklch(0.68 0.155 288 / 50%);
+  --sidebar-ring: oklch(0.72 0.17 288 / 50%);
 
   /* LeadMind brand layer (dark) */
   --lm-sidebar: oklch(0.128 0.014 265);
   --lm-sidebar-hover: oklch(1 0 0 / 5%);
-  --lm-brand: oklch(0.72 0.15 288);            /* restrained electric violet */
-  --lm-brand-soft: oklch(0.72 0.15 288 / 0.13);
-  --lm-info: oklch(0.72 0.11 250);             /* subtle blue */
-  --lm-info-soft: oklch(0.72 0.11 250 / 0.12);
+  --lm-brand: oklch(0.74 0.17 288);             /* electric violet */
+  --lm-brand-soft: oklch(0.74 0.17 288 / 0.14);
+  --lm-info: oklch(0.74 0.14 248);              /* cobalt */
+  --lm-info-soft: oklch(0.74 0.14 248 / 0.12);
+  --lm-lime: oklch(0.87 0.2 130);               /* signal lime */
+  --lm-lime-soft: oklch(0.87 0.2 130 / 0.14);
   --lm-success: oklch(0.72 0.15 162);
   --lm-warning: oklch(0.79 0.15 70);
   --lm-danger: oklch(0.71 0.19 22);
   --lm-elevated: oklch(0.235 0.017 265);
   --lm-hairline: oklch(1 0 0 / 6%);
+  --lm-grid-dot: oklch(0.74 0.17 288 / 12%);
+  --lm-shadow: 0 1px 2px oklch(0 0 0 / 35%), 0 10px 28px -14px oklch(0 0 0 / 45%);
+  --lm-shadow-hover: 0 2px 6px oklch(0 0 0 / 35%), 0 18px 40px -14px oklch(0.55 0.14 288 / 40%);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
+  }
+  html {
+    font-family: var(--font-sans);
   }
   body {
     @apply bg-background text-foreground;
@@ -188,23 +216,23 @@
   pointer-events: none;
   background:
     radial-gradient(560px 200px at 12% -8%, var(--lm-brand-soft), transparent 70%),
-    radial-gradient(480px 180px at 88% -12%, var(--lm-info-soft), transparent 72%);
+    radial-gradient(480px 180px at 88% -12%, var(--lm-info-soft), transparent 72%),
+    radial-gradient(300px 120px at 55% 0%, var(--lm-lime-soft), transparent 75%);
 }
 
-/* Translucent copilot chat surface with corner lighting (scoped via [data-chat-surface]) */
-[data-chat-surface] {
+/* Faint engineering dot-grid behind page content — depth without noise */
+.lm-dotgrid {
   position: relative;
-  isolation: isolate;
 }
-[data-chat-surface]::before {
+.lm-dotgrid::before {
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 0;
-  background:
-    radial-gradient(420px 200px at 8% 0%, var(--lm-brand-soft), transparent 70%),
-    radial-gradient(380px 180px at 96% 4%, var(--lm-info-soft), transparent 72%);
+  background-image: radial-gradient(circle at 1px 1px, var(--lm-grid-dot) 1px, transparent 0);
+  background-size: 22px 22px;
+  -webkit-mask-image: linear-gradient(to bottom, black 0%, transparent 42%);
+  mask-image: linear-gradient(to bottom, black 0%, transparent 42%);
 }
 
 /* Gradient brand text for hero metrics */
@@ -213,6 +241,58 @@
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+/* ── Typography primitives ────────────────────────────────────────────────── */
+
+/* Mono eyebrow label above page titles */
+.lm-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;      /* 11px */
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--lm-brand);
+}
+.lm-eyebrow::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--lm-lime);
+  box-shadow: 0 0 8px 0 var(--lm-lime);
+}
+
+/* Card section heading — Space Grotesk for brand voice */
+.lm-card-title {
+  font-family: var(--font-display);
+  font-size: 0.9375rem;      /* 15px */
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--card-foreground);
+}
+
+/* Display metric — tabular, tight, confident */
+.lm-metric {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+/* ── Micro-interactions ───────────────────────────────────────────────────── */
+
+.lm-lift {
+  transition: transform var(--lm-med) var(--lm-ease), box-shadow var(--lm-med) var(--lm-ease);
+  box-shadow: var(--lm-shadow);
+}
+.lm-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--lm-shadow-hover);
 }
 
 /* ── Spotlight card (scoped to component via [data-spotlight]) ────────────── */
@@ -247,6 +327,23 @@
   }
 }
 
+/* ── Translucent copilot chat surface with corner lighting ────────────────── */
+
+[data-chat-surface] {
+  position: relative;
+  isolation: isolate;
+}
+[data-chat-surface]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(420px 200px at 8% 0%, var(--lm-brand-soft), transparent 70%),
+    radial-gradient(380px 180px at 96% 4%, var(--lm-info-soft), transparent 72%);
+}
+
 /* ── Custom scrollbars ────────────────────────────────────────────────────── */
 
 .lm-scroll::-webkit-scrollbar,
@@ -270,11 +367,12 @@
 
 .lm-prose {
   font-size: 0.875rem;
-  line-height: 1.6;
+  line-height: 1.65;
   overflow-wrap: anywhere;
 }
 .lm-prose h2,
 .lm-prose h3 {
+  font-family: var(--font-display);
   font-weight: 600;
   margin-top: 0.9rem;
   margin-bottom: 0.35rem;
@@ -298,6 +396,7 @@
 }
 .lm-prose table {
   width: 100%;
+  min-width: max-content;
   border-collapse: collapse;
   margin: 0.55rem 0;
   font-size: 0.8rem;
@@ -375,7 +474,14 @@
   .lm-pulse-dot {
     animation: none;
   }
+  .lm-lift,
+  .lm-lift:hover {
+    transition: none;
+    transform: none;
+  }
   * {
     scroll-behavior: auto !important;
   }
 }
+
+/* lm-brand refresh */

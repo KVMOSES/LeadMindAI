@@ -241,7 +241,7 @@ export function SettingsView({ session }: { session: SessionData }) {
 
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <Skeleton className="h-9 w-64" />
         <Skeleton className="h-10 w-96" />
         <Skeleton className="h-96" />
@@ -250,7 +250,7 @@ export function SettingsView({ session }: { session: SessionData }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader title="Workspace Settings" description="Configure the intelligence engines, knowledge base and conversational memory. Changes are versioned and audit-logged." />
 
       <Tabs value={tab} onValueChange={setTab}>
@@ -576,7 +576,7 @@ export function SettingsView({ session }: { session: SessionData }) {
             <CardContent className="space-y-4">
               <div className="flex items-start justify-between gap-3 rounded-md border px-3 py-3">
                 <div>
-                  <p className="text-sm font-medium">Engine</p>
+                  <p className="lm-card-title">Engine</p>
                   <p className="text-xs text-muted-foreground">
                     {session.llmMode === "live"
                       ? "An external LLM is connected via server-side SDK. Tool calls are validated by the application."
@@ -589,14 +589,14 @@ export function SettingsView({ session }: { session: SessionData }) {
               </div>
               <div className="flex items-start justify-between gap-3 rounded-md border px-3 py-3">
                 <div>
-                  <p className="text-sm font-medium">Knowledge retrieval</p>
+                  <p className="lm-card-title">Knowledge retrieval</p>
                   <p className="text-xs text-muted-foreground">{docs.length} indexed document(s), TF-IDF retrieval with source attribution.</p>
                 </div>
                 <Badge variant="outline">{docs.length} docs</Badge>
               </div>
               <div className="flex items-start justify-between gap-3 rounded-md border px-3 py-3">
                 <div>
-                  <p className="text-sm font-medium">Approved memories</p>
+                  <p className="lm-card-title">Approved memories</p>
                   <p className="text-xs text-muted-foreground">{memories.filter((m) => m.approved).length} item(s) currently in assistant context.</p>
                 </div>
                 <Badge variant="outline">{memories.filter((m) => m.approved).length}</Badge>

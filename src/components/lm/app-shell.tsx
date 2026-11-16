@@ -62,6 +62,7 @@ import { ExplainabilityView } from "@/components/lm/explainability-view";
 import { FeedbackView } from "@/components/lm/feedback-view";
 import { MonitoringView } from "@/components/lm/monitoring-view";
 import { SettingsView } from "@/components/lm/settings-view";
+import { LogoMark, LogoWordmark } from "@/components/lm/logo";
 
 // ── Navigation model ─────────────────────────────────────────────────────────
 
@@ -116,15 +117,8 @@ function navLabelFor(view: ViewKey): string {
 function BrandMark({ compact = false }: { compact?: boolean }) {
   return (
     <div className={cn("flex items-center gap-2.5", compact && "justify-center")}>
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--lm-brand-soft)] ring-1 ring-[var(--lm-brand)]/30">
-        <BrainCircuit className="h-4.5 w-4.5 text-[var(--lm-brand)]" aria-hidden="true" />
-      </div>
-      {!compact && (
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold tracking-tight text-zinc-100">LeadMind AI</p>
-          <p className="truncate text-[10px] text-zinc-500">Sales Intelligence OS</p>
-        </div>
-      )}
+      <LogoMark size={compact ? 28 : 32} />
+      {!compact && <LogoWordmark />}
     </div>
   );
 }
@@ -228,11 +222,11 @@ export function AppShell({ session, onLogout }: { session: SessionData; onLogout
             </button>
           )}
 
-          <nav className={cn("lm-scroll mt-3 flex-1 space-y-4 overflow-y-auto px-3 pb-4", collapsed && "px-2")} aria-label="Primary">
+          <nav className={cn("lm-scroll mt-4 flex-1 space-y-5 overflow-y-auto px-3 pb-4", collapsed && "px-2")} aria-label="Primary">
             {NAV_GROUPS.map((group) => (
               <div key={group.label}>
                 {!collapsed && (
-                  <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                  <p className="mb-1.5 px-2 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
                     {group.label}
                   </p>
                 )}
@@ -407,8 +401,8 @@ export function AppShell({ session, onLogout }: { session: SessionData; onLogout
           </header>
 
           {/* Page content */}
-          <main className="min-h-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">
-            <div className="lm-fade-up mx-auto w-full max-w-[1400px]" key={view + (activeLeadId ?? "")}>
+          <main className="lm-dotgrid min-h-0 flex-1 px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
+            <div className="lm-fade-up relative mx-auto w-full max-w-[1400px] space-y-5" key={view + (activeLeadId ?? "")}>
               {view === "dashboard" && <DashboardView session={session} />}
               {view === "leads" && <LeadsView session={session} />}
               {view === "lead" && <LeadProfileView session={session} />}
@@ -428,7 +422,7 @@ export function AppShell({ session, onLogout }: { session: SessionData; onLogout
           <footer className="mt-auto border-t bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6">
             <div className="mx-auto flex w-full max-w-[1400px] items-center justify-between gap-4 text-xs text-muted-foreground">
               <span className="flex items-center gap-2">
-                <BrainCircuit className="size-3.5 text-[var(--lm-brand)]" aria-hidden="true" />
+                <LogoMark size={16} badge={false} aria-hidden="true" />
                 LeadMind AI — conversational sales intelligence · {session.workspace.name}
               </span>
               <span className="hidden sm:inline">
@@ -449,10 +443,10 @@ export function AppShell({ session, onLogout }: { session: SessionData; onLogout
               </div>
             </SheetTitle>
           </SheetHeader>
-          <nav className="lm-scroll space-y-4 overflow-y-auto px-3 py-4" aria-label="Mobile">
+          <nav className="lm-scroll space-y-5 overflow-y-auto px-3 py-4" aria-label="Mobile">
             {NAV_GROUPS.map((group) => (
               <div key={group.label}>
-                <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">
+                <p className="mb-1.5 px-2 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
                   {group.label}
                 </p>
                 <ul className="space-y-0.5">

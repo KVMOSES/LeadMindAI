@@ -3,7 +3,6 @@
 import * as React from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import {
-  BrainCircuit,
   Eye,
   EyeOff,
   Loader2,
@@ -19,6 +18,7 @@ import {
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { LiquidGlassButton } from "@/components/ui/liquid-glass-button";
+import { LogoMark, LogoWordmark } from "@/components/lm/logo";
 
 /**
  * SmokeLogin — split-screen authentication experience.
@@ -407,17 +407,12 @@ export function SmokeLogin({ onSubmit, onDemo, demoEmail = "", demoPassword = ""
           animate="show"
         >
           <motion.div variants={animate ? itemVariants : undefined} className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--lm-brand-soft)] ring-1 ring-[var(--lm-brand)]/35 backdrop-blur">
-              <BrainCircuit className="h-5 w-5 text-[var(--lm-brand)]" aria-hidden="true" />
-            </div>
-            <div>
-              <p className="text-base font-semibold tracking-tight">LeadMind AI</p>
-              <p className="text-[11px] text-muted-foreground">Sales Intelligence OS</p>
-            </div>
+            <LogoMark size={40} />
+            <LogoWordmark />
           </motion.div>
 
           <motion.div variants={animate ? itemVariants : undefined} className="max-w-xl">
-            <h1 className="text-4xl font-semibold leading-[1.12] tracking-tight xl:text-[2.75rem]">
+            <h1 className="font-display text-4xl font-bold leading-[1.08] tracking-tight xl:text-[2.85rem]">
               Stop staring at dashboards.
               <span className="lm-brand-text block">Ask your pipeline questions.</span>
             </h1>
@@ -449,10 +444,8 @@ export function SmokeLogin({ onSubmit, onDemo, demoEmail = "", demoPassword = ""
         {/* Top bar: mobile brand + theme switch */}
         <div className="relative z-10 flex items-center justify-between px-6 pt-6 sm:px-10">
           <div className="flex items-center gap-2.5 lg:invisible">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--lm-brand-soft)] ring-1 ring-[var(--lm-brand)]/30">
-              <BrainCircuit className="h-4 w-4 text-[var(--lm-brand)]" aria-hidden="true" />
-            </div>
-            <p className="text-sm font-semibold tracking-tight">LeadMind AI</p>
+            <LogoMark size={30} />
+            <p className="font-display text-sm font-bold tracking-tight">LeadMind AI</p>
           </div>
           <button
             type="button"
@@ -473,7 +466,8 @@ export function SmokeLogin({ onSubmit, onDemo, demoEmail = "", demoPassword = ""
             animate="show"
           >
             <motion.div variants={animate ? itemVariants : undefined}>
-              <h2 className="text-2xl font-semibold tracking-tight">Welcome back</h2>
+              <p className="lm-eyebrow mb-2">LeadMind workspace</p>
+              <h2 className="font-display text-[26px] font-bold leading-tight tracking-tight">Welcome back</h2>
               <p className="mt-1.5 text-sm text-muted-foreground">
                 Your sales intelligence workspace awaits.
               </p>

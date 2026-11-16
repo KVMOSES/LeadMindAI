@@ -575,7 +575,7 @@ export function ModelsView({ session }: { session: SessionData }) {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         eyebrow="Model Ops"
         title="Model Intelligence"

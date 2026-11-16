@@ -45,7 +45,7 @@ function ScoreBar({ label, value, percent = false }: { label: string; value: num
   return (
     <div className="min-w-0 flex-1">
       <div className="flex items-baseline justify-between gap-1">
-        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{label}</span>
+        <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{label}</span>
         <span className={cn("text-xs font-semibold tabular-nums", scoreColor(value))}>
           {raw === null ? "—" : percent ? `${raw}%` : raw}
         </span>
@@ -175,7 +175,7 @@ export function ProfilesView({ session: _session }: { session: SessionData }) {
   const hasHighlights = highlights.probability || highlights.fit || highlights.intent;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         eyebrow="Intelligence"
         title="Intelligence Profiles"
@@ -201,7 +201,7 @@ export function ProfilesView({ session: _session }: { session: SessionData }) {
                 <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[var(--lm-brand-soft)]">
                   <Gauge className="size-3.5 text-[var(--lm-brand)]" aria-hidden="true" />
                 </span>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Highest conversion probability</p>
+                <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Highest conversion probability</p>
               </div>
               <button
                 type="button"
@@ -210,7 +210,7 @@ export function ProfilesView({ session: _session }: { session: SessionData }) {
                 aria-label={`Open ${highlights.probability.companyName} profile`}
               >
                 <p className="truncate text-sm font-semibold">{highlights.probability.companyName}</p>
-                <p className="mt-0.5 text-2xl font-semibold tabular-nums text-[var(--lm-brand)]">
+                <p className="lm-metric mt-2 text-[26px] text-[var(--lm-brand)]">
                   {Math.round(highlights.probability.probability! * 100)}%
                 </p>
               </button>
@@ -222,7 +222,7 @@ export function ProfilesView({ session: _session }: { session: SessionData }) {
                 <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[var(--lm-info-soft)]">
                   <HeartPulse className="size-3.5 text-[var(--lm-info)]" aria-hidden="true" />
                 </span>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Strongest ICP fit</p>
+                <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Strongest ICP fit</p>
               </div>
               <button
                 type="button"
@@ -231,7 +231,7 @@ export function ProfilesView({ session: _session }: { session: SessionData }) {
                 aria-label={`Open ${highlights.fit.companyName} profile`}
               >
                 <p className="truncate text-sm font-semibold">{highlights.fit.companyName}</p>
-                <p className="mt-0.5 text-2xl font-semibold tabular-nums text-[var(--lm-info)]">
+                <p className="lm-metric mt-2 text-[26px] text-[var(--lm-info)]">
                   {Math.round(highlights.fit.fit!)}/100
                 </p>
               </button>
@@ -243,7 +243,7 @@ export function ProfilesView({ session: _session }: { session: SessionData }) {
                 <span className="flex h-7 w-7 items-center justify-center rounded-md bg-amber-500/10">
                   <Thermometer className="size-3.5 text-amber-500" aria-hidden="true" />
                 </span>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Hottest buying intent</p>
+                <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Hottest buying intent</p>
               </div>
               <button
                 type="button"
@@ -252,7 +252,7 @@ export function ProfilesView({ session: _session }: { session: SessionData }) {
                 aria-label={`Open ${highlights.intent.companyName} profile`}
               >
                 <p className="truncate text-sm font-semibold">{highlights.intent.companyName}</p>
-                <p className="mt-0.5 text-2xl font-semibold tabular-nums text-amber-500">
+                <p className="lm-metric mt-2 text-[26px] text-amber-500">
                   {Math.round(highlights.intent.intent!)}/100
                 </p>
               </button>

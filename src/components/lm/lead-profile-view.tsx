@@ -175,7 +175,7 @@ export function LeadProfileView({ session }: { session: SessionData }) {
 
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <Skeleton className="h-9 w-72" />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -281,7 +281,7 @@ export function LeadProfileView({ session }: { session: SessionData }) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex flex-col gap-3">
         <Button variant="ghost" onClick={() => navigate("leads")} className="-ml-2 w-fit pl-2 text-muted-foreground">
@@ -289,8 +289,8 @@ export function LeadProfileView({ session }: { session: SessionData }) {
         </Button>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-semibold tracking-tight">{lead.contactName}</h1>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h1 className="font-display text-[1.55rem] font-bold leading-tight tracking-tight">{lead.contactName}</h1>
               <Badge variant="outline" className="font-medium">{prettify(lead.status)}</Badge>
               <QualBadge category={qual?.category ?? assessments.qualification?.category ?? null} source={qual?.source} />
               {lead.dealValue !== null && <Badge variant="outline" className="font-medium">{fmtMoney(lead.dealValue)}</Badge>}
@@ -353,7 +353,7 @@ export function LeadProfileView({ session }: { session: SessionData }) {
           <CardContent className="flex items-center gap-4 p-4">
             <ScoreRing score={assessments.fit?.score ?? null} size={72} />
             <div className="min-w-0">
-              <p className="text-sm font-medium">Customer fit</p>
+              <p className="lm-card-title">Customer fit</p>
               <p className="text-xs text-muted-foreground">ICP {assessments.fit?.version ?? "—"}</p>
               <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{assessments.fit?.explanation ?? "Not assessed yet"}</p>
             </div>
@@ -363,7 +363,7 @@ export function LeadProfileView({ session }: { session: SessionData }) {
           <CardContent className="flex items-center gap-4 p-4">
             <ScoreRing score={assessments.intent?.score ?? null} size={72} />
             <div className="min-w-0">
-              <p className="text-sm font-medium">Buying intent</p>
+              <p className="lm-card-title">Buying intent</p>
               <p className="text-xs text-muted-foreground">
                 {assessments.intent?.score === null ? "No engagement data yet" : `config ${assessments.intent?.version ?? "—"}`}
               </p>
@@ -377,7 +377,7 @@ export function LeadProfileView({ session }: { session: SessionData }) {
           <CardContent className="flex items-center gap-4 p-4">
             <ScoreRing score={assessments.prediction ? assessments.prediction.probability * 100 : null} size={72} />
             <div className="min-w-0">
-              <p className="text-sm font-medium">Conversion</p>
+              <p className="lm-card-title">Conversion</p>
               <p className="text-xs text-muted-foreground">{assessments.prediction ? assessments.prediction.algorithm.toLowerCase() : "no valid model"}</p>
               {assessments.prediction && (
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -389,7 +389,7 @@ export function LeadProfileView({ session }: { session: SessionData }) {
         </Card>
         <Card className="p-0 gap-0">
           <CardContent className="p-4">
-            <p className="text-sm font-medium">Qualification</p>
+            <p className="lm-card-title">Qualification</p>
             <div className="mt-2"><QualBadge category={assessments.qualification?.category ?? null} /></div>
             <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
               {(assessments.qualification?.reasons ?? ["Run an assessment to classify this lead"]).slice(0, 3).map((r, i) => (
@@ -542,7 +542,7 @@ export function LeadProfileView({ session }: { session: SessionData }) {
                         )}
                       />
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <p className="text-sm font-medium">{prettify(t.label)}</p>
+                        <p className="lm-card-title">{prettify(t.label)}</p>
                         <span className="text-xs text-muted-foreground">{fmtDateTime(t.at)}</span>
                       </div>
                       {t.detail && <p className="text-xs text-muted-foreground">{t.detail}</p>}

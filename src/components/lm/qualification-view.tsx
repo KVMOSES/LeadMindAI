@@ -107,7 +107,7 @@ function OverrideForm({
       <CardContent className="p-4">
         <div className="flex items-center gap-2">
           <UserCheck className="size-4 text-[var(--lm-brand)]" aria-hidden="true" />
-          <p className="text-sm font-medium">Manual override</p>
+          <p className="lm-card-title">Manual override</p>
           <Badge variant="outline" className="ml-auto text-[10px] text-muted-foreground">
             logged &amp; audited
           </Badge>
@@ -223,7 +223,7 @@ export function QualificationView({ session }: { session: SessionData }) {
   const prediction = detail?.assessments.prediction ?? null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         eyebrow="Intelligence"
         title="Qualification"
@@ -234,7 +234,7 @@ export function QualificationView({ session }: { session: SessionData }) {
         {/* Lead list */}
         <Card className="lm-panel p-0 gap-0 overflow-hidden">
           <div className="border-b p-3">
-            <p className="text-sm font-medium">Workspace leads</p>
+            <p className="lm-card-title">Workspace leads</p>
             <p className="text-xs text-muted-foreground">Select a lead to inspect its qualification</p>
           </div>
           <div className="flex gap-1 overflow-x-auto border-b px-3 py-2" role="tablist" aria-label="Filter by qualification">
@@ -368,7 +368,7 @@ export function QualificationView({ session }: { session: SessionData }) {
 
                   {/* Qualification reasons */}
                   <div className="mt-3 rounded-lg border bg-muted/30 p-3">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Qualification reasons</p>
+                    <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Qualification reasons</p>
                     {detail.assessments.qualification?.reasons?.length ? (
                       <ul className="mt-2 space-y-1.5">
                         {detail.assessments.qualification.reasons.map((r, i) => (
@@ -399,7 +399,7 @@ export function QualificationView({ session }: { session: SessionData }) {
                 <Card className="lm-panel p-0 gap-0">
                   <CardContent className="p-4">
                     <div className="flex items-baseline justify-between gap-2">
-                      <p className="text-sm font-medium">Customer fit criteria</p>
+                      <p className="lm-card-title">Customer fit criteria</p>
                       <span className={cn("text-sm font-semibold tabular-nums", scoreColor(fit?.score ?? null))}>
                         {fit ? `${Math.round(fit.score)}/100` : "—"}
                       </span>
@@ -420,7 +420,7 @@ export function QualificationView({ session }: { session: SessionData }) {
                 <Card className="lm-panel p-0 gap-0">
                   <CardContent className="p-4">
                     <div className="flex items-baseline justify-between gap-2">
-                      <p className="text-sm font-medium">Buying intent signals</p>
+                      <p className="lm-card-title">Buying intent signals</p>
                       <span className={cn("text-sm font-semibold tabular-nums", scoreColor(intent?.score ?? null))}>
                         {intent && intent.score !== null ? `${Math.round(intent.score)}/100` : "unknown"}
                       </span>
@@ -450,7 +450,7 @@ export function QualificationView({ session }: { session: SessionData }) {
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2">
                     <History className="size-4 text-muted-foreground" aria-hidden="true" />
-                    <p className="text-sm font-medium">Qualification history</p>
+                    <p className="lm-card-title">Qualification history</p>
                     <Badge variant="outline" className="ml-auto text-[10px] text-muted-foreground">
                       {detail.history.qualifications.length} entr{detail.history.qualifications.length === 1 ? "y" : "ies"}
                     </Badge>

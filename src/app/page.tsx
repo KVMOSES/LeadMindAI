@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { SessionData } from "@/lib/store";
 import { LoginScreen } from "@/components/lm/login-screen";
 import { AppShell } from "@/components/lm/app-shell";
+import { LogoMark } from "@/components/lm/logo";
 
 export default function Home() {
   const [status, setStatus] = useState<"loading" | "anon" | "authed">("loading");
@@ -40,11 +40,16 @@ export default function Home() {
 
   if (status === "loading") {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background text-muted-foreground">
-        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--lm-brand-soft)] ring-1 ring-[var(--lm-brand)]/30">
-          <Loader2 className="h-6 w-6 animate-spin text-[var(--lm-brand)]" />
+      <div className="lm-ambient flex min-h-screen flex-col items-center justify-center gap-4 bg-background text-muted-foreground">
+        <div className="relative">
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 -z-10 rounded-full blur-2xl"
+            style={{ background: "radial-gradient(closest-side, var(--lm-brand-soft), transparent)" }}
+          />
+          <LogoMark size={48} />
         </div>
-        <p className="text-sm">Starting LeadMind AI…</p>
+        <p className="font-mono text-xs uppercase tracking-[0.18em]">Starting LeadMind AI…</p>
         {bootError && <p className="text-xs text-rose-400">{bootError}</p>}
       </div>
     );

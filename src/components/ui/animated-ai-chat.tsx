@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { LiquidGlassButton } from "@/components/ui/liquid-glass-button";
 import { Textarea } from "@/components/ui/textarea";
 import { Markdown } from "@/components/lm/shared";
+import { LogoMark } from "@/components/lm/logo";
 
 /**
  * AnimatedAiChat — presentation layer for the LeadMind Copilot.
@@ -441,11 +442,9 @@ export function AnimatedAiChat({
       {/* ── Chat toolbar ──────────────────────────────────────────────────── */}
       <div className="relative z-10 flex items-center justify-between gap-2 border-b border-border/70 px-4 py-2.5">
         <div className="flex min-w-0 items-center gap-2">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[var(--lm-brand-soft)] ring-1 ring-[var(--lm-brand)]/30">
-            <BrainCircuit className="h-4 w-4 text-[var(--lm-brand)]" aria-hidden="true" />
-          </div>
+          <LogoMark size={26} />
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium">LeadMind Copilot</p>
+            <p className="truncate font-display text-sm font-bold">LeadMind Copilot</p>
             {contextLead ? (
               <p className="truncate text-xs text-muted-foreground">
                 Context:{" "}
@@ -522,11 +521,9 @@ export function AnimatedAiChat({
                     className="absolute inset-0 -z-10 rounded-full blur-2xl"
                     style={{ background: "radial-gradient(closest-side, var(--lm-brand-soft), transparent)" }}
                   />
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--lm-brand-soft)] ring-1 ring-[var(--lm-brand)]/30">
-                    <BrainCircuit className="h-7 w-7 text-[var(--lm-brand)]" aria-hidden="true" />
-                  </div>
+                  <LogoMark size={56} />
                 </div>
-                <p className="text-base font-semibold">Ask your pipeline anything</p>
+                <p className="font-display text-base font-bold">Ask your pipeline anything</p>
                 <p className="mt-1.5 max-w-md text-sm leading-relaxed text-muted-foreground">
                   The Copilot investigates real workspace data through validated tools — lead search,
                   scoring explanations, analytics, recommendations and knowledge retrieval. It never
@@ -564,8 +561,8 @@ export function AnimatedAiChat({
                     className={cn("flex gap-3", m.role === "USER" ? "justify-end" : "justify-start")}
                   >
                     {m.role === "ASSISTANT" && (
-                      <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[var(--lm-brand-soft)] ring-1 ring-[var(--lm-brand)]/30">
-                        <BrainCircuit className="h-4 w-4 text-[var(--lm-brand)]" aria-hidden="true" />
+                      <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[var(--lm-brand-soft)] ring-1 ring-[var(--lm-brand)]/25">
+                        <LogoMark size={18} badge={false} />
                       </div>
                     )}
                     <div className={cn("min-w-0 max-w-[85%] space-y-2 sm:max-w-[78%]", m.role === "USER" && "flex flex-col items-end")}>
@@ -719,22 +716,6 @@ export function AnimatedAiChat({
 
       {/* ── Composer ──────────────────────────────────────────────────────── */}
       <div className="relative z-10 border-t border-border/70 p-3">
-        {messages.length === 0 && suggestions.length > 0 && (
-          <div className="mb-2 flex flex-wrap gap-1.5 lg:hidden">
-            {suggestions.slice(0, 3).map((s, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => onSend(expandSlashCommand(s))}
-                disabled={sending}
-                className="rounded-full border px-2.5 py-1 text-[11px] text-muted-foreground"
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        )}
-
         <div className="relative">
           <CommandPalette
             visible={paletteOpen}

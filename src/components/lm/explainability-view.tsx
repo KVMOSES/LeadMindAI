@@ -165,7 +165,7 @@ export function ExplainabilityView({ session: _session }: { session: SessionData
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         eyebrow="Model Ops"
         title="Explainability Studio"
@@ -326,7 +326,7 @@ export function ExplainabilityView({ session: _session }: { session: SessionData
               {prediction ? (
                 <>
                   <div className="flex items-center gap-3">
-                    <span className="text-2xl font-semibold tabular-nums">{(prediction.probability * 100).toFixed(1)}%</span>
+                    <span className="lm-metric text-[26px]">{(prediction.probability * 100).toFixed(1)}%</span>
                     <Badge className={cn("font-medium", decisionBadgeClass(prediction.decision))}>{decisionLabel(prediction.decision)}</Badge>
                   </div>
                   {prediction.contributions.length > 0 ? (

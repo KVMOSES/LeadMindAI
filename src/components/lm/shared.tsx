@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { fmtRelative, priorityColor, qualColor, qualLabel, scoreColor } from "@/lib/api";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type { ScoreFactor } from "@/lib/types";
 
 // ── Score ring ───────────────────────────────────────────────────────────────
@@ -18,26 +19,30 @@ export function ScoreRing({ score, size = 64, label }: { score: number | null; s
   const color = score === null ? "var(--muted-foreground)" : score >= 70 ? "#10b981" : score >= 40 ? "#f59e0b" : "#f43f5e";
   return (
     <div className="flex flex-col items-center gap-1" role="meter" aria-valuenow={score ?? undefined} aria-valuemin={0} aria-valuemax={100} aria-label={label ?? "score"}>
-      <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--muted)" strokeWidth={stroke} />
-        {score !== null && (
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={r}
-            fill="none"
-            stroke={color}
-            strokeWidth={stroke}
-            strokeDasharray={c}
-            strokeDashoffset={c * (1 - pct)}
-            strokeLinecap="round"
-          />
-        )}
-      </svg>
-      <span className={cn("absolute text-sm font-semibold", scoreColor(score))} style={{ marginTop: -(size / 2) - 9 }}>
-        {score === null ? "—" : Math.round(score)}
-      </span>
-      {label && <span className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</span>}
+      <div className="relative" style={{ width: size, height: size }}>
+        <svg width={size} height={size} className="-rotate-90">
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--muted)" strokeWidth={stroke} />
+          {score !== null && (
+            <circle
+              cx={size / 2}
+              cy={size / 2}
+              r={r}
+              fill="none"
+              stroke={color}
+              strokeWidth={stroke}
+              strokeDasharray={c}
+              strokeDashoffset={c * (1 - pct)}
+              strokeLinecap="round"
+            />
+          )}
+        </svg>
+        <span
+          className={cn("lm-metric absolute inset-0 flex items-center justify-center text-sm", scoreColor(score))}
+        >
+          {score === null ? "—" : Math.round(score)}
+        </span>
+      </div>
+      {label && <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{label}</span>}
     </div>
   );
 }
@@ -54,20 +59,21 @@ export function StatCard({
   title: string;
   value: string | number;
   hint?: string;
-  tone?: "default" | "brand" | "warning" | "danger" | "info";
+  tone?: "default" | "brand" | "warning" | "danger" | "info" | "lime";
   icon?: React.ReactNode;
 }) {
   return (
-    <Card className="lm-panel p-0 gap-0 overflow-hidden">
+    <Card className="lm-panel lm-lift p-0 gap-0 overflow-hidden">
       <CardContent className="p-4">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">{title}</p>
+          <p className="whitespace-nowrap font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{title}</p>
           {icon && (
             <span
               className={cn(
-                "flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
+                "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
                 tone === "brand" && "bg-[var(--lm-brand-soft)] text-[var(--lm-brand)]",
                 tone === "info" && "bg-[var(--lm-info-soft)] text-[var(--lm-info)]",
+                tone === "lime" && "bg-[var(--lm-lime-soft)] text-[var(--lm-lime)]",
                 tone === "warning" && "bg-amber-500/10 text-amber-500",
                 tone === "danger" && "bg-rose-500/10 text-rose-500",
                 tone === "default" && "bg-muted text-muted-foreground",
@@ -79,16 +85,17 @@ export function StatCard({
         </div>
         <p
           className={cn(
-            "mt-1.5 text-2xl font-semibold tabular-nums tracking-tight",
+            "lm-metric mt-2 text-[26px]",
             tone === "brand" && "text-[var(--lm-brand)]",
             tone === "info" && "text-[var(--lm-info)]",
+            tone === "lime" && "text-[var(--lm-lime)]",
             tone === "warning" && "text-amber-600 dark:text-amber-400",
             tone === "danger" && "text-rose-600 dark:text-rose-400",
           )}
         >
           {value}
         </p>
-        {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}
+        {hint && <p className="mt-1.5 text-xs text-muted-foreground">{hint}</p>}
       </CardContent>
     </Card>
   );
@@ -180,12 +187,12 @@ export function ContributionBars({
 
 export function EmptyState({ title, description, icon }: { title: string; description?: string; icon?: React.ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center py-14 text-center">
+    <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
       {icon && (
-        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-muted/60 text-muted-foreground">{icon}</div>
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-muted/60 text-muted-foreground">{icon}</div>
       )}
-      <p className="font-medium">{title}</p>
-      {description && <p className="mt-1 max-w-md text-sm text-muted-foreground">{description}</p>}
+      <p className="font-display text-base font-semibold">{title}</p>
+      {description && <p className="mt-1.5 max-w-md text-sm leading-relaxed text-muted-foreground">{description}</p>}
     </div>
   );
 }
@@ -212,6 +219,7 @@ export function Markdown({ content, className }: { content: string; className?: 
   return (
     <div className={cn("lm-prose", className)}>
       <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
         components={{
           a: (props) => <a {...props} className="text-[var(--lm-brand)] underline underline-offset-2" target="_blank" rel="noreferrer" />,
         }}
@@ -236,15 +244,17 @@ export function PageHeader({
   eyebrow?: string;
 }) {
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="min-w-0">
-        {eyebrow && (
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--lm-brand)]">{eyebrow}</p>
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div className="min-w-0 space-y-1.5">
+        {eyebrow && <p className="lm-eyebrow">{eyebrow}</p>}
+        <h1 className="font-display text-[1.55rem] font-bold leading-tight tracking-tight lg:text-[1.75rem]">
+          {title}
+        </h1>
+        {description && (
+          <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">{description}</p>
         )}
-        <h1 className="text-xl font-semibold tracking-tight lg:text-2xl">{title}</h1>
-        {description && <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{description}</p>}
       </div>
-      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
     </div>
   );
 }

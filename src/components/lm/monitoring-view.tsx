@@ -179,7 +179,7 @@ export function MonitoringView({ session: _session }: { session: SessionData }) 
   const totalIssues = quality?.issues.length ?? 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         eyebrow="Operations"
         title="Monitoring"
@@ -253,7 +253,7 @@ export function MonitoringView({ session: _session }: { session: SessionData }) 
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
                 <Stethoscope className="size-4 text-[var(--lm-brand)]" aria-hidden="true" />
-                <p className="text-sm font-medium">Model health</p>
+                <p className="lm-card-title">Model health</p>
                 {production && (
                   <Badge variant="outline" className="ml-auto font-mono text-[11px] text-muted-foreground">
                     {production.versionTag}
@@ -295,7 +295,7 @@ export function MonitoringView({ session: _session }: { session: SessionData }) 
               <CardContent className="p-4">
                 <div className="flex items-center gap-2">
                   <Waves className="size-4 text-[var(--lm-info)]" aria-hidden="true" />
-                  <p className="text-sm font-medium">Feature drift (PSI)</p>
+                  <p className="lm-card-title">Feature drift (PSI)</p>
                   {drift && <Badge className={cn("ml-auto font-medium", driftBadgeClass(drift.status))}>{drift.status}</Badge>}
                 </div>
                 {!drift ? (
@@ -334,7 +334,7 @@ export function MonitoringView({ session: _session }: { session: SessionData }) 
               <CardContent className="p-4">
                 <div className="flex items-center gap-2">
                   <Database className="size-4 text-[var(--lm-brand)]" aria-hidden="true" />
-                  <p className="text-sm font-medium">Data quality</p>
+                  <p className="lm-card-title">Data quality</p>
                 </div>
                 {!quality ? (
                   <p className="mt-2 text-sm text-muted-foreground">No quality report available.</p>
@@ -395,7 +395,7 @@ export function MonitoringView({ session: _session }: { session: SessionData }) 
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
                 <Activity className="size-4 text-[var(--lm-info)]" aria-hidden="true" />
-                <p className="text-sm font-medium">Agent runs</p>
+                <p className="lm-card-title">Agent runs</p>
                 <span className="ml-auto text-xs text-muted-foreground">Latest {runs.length}</span>
               </div>
               {runs.length === 0 ? (

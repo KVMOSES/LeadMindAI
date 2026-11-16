@@ -228,11 +228,11 @@ function ScoreCell({ value, percent = false }: { value: number | null; percent?:
   const clamped = Math.min(100, Math.max(0, raw));
   const barTone = raw >= 70 ? "[&>div]:bg-emerald-500" : raw >= 40 ? "[&>div]:bg-amber-500" : "[&>div]:bg-rose-500";
   return (
-    <div className="flex items-center gap-2">
-      <span className={cn("w-10 shrink-0 text-right text-sm font-medium tabular-nums", scoreColor(value))}>
+    <div className="flex items-center gap-1.5">
+      <span className={cn("w-8 shrink-0 text-right text-sm font-medium tabular-nums", scoreColor(value))}>
         {percent ? `${raw}%` : raw}
       </span>
-      <Progress value={clamped} className={cn("h-1 w-16", barTone)} />
+      <Progress value={clamped} className={cn("h-1 w-14", barTone)} />
     </div>
   );
 }
@@ -730,7 +730,7 @@ export function LeadsView({ session }: { session: SessionData }) {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         eyebrow="Pipeline"
         title="Lead Universe"
@@ -852,8 +852,8 @@ export function LeadsView({ session }: { session: SessionData }) {
             </div>
           )}
           <div className="overflow-x-auto" aria-busy={loading}>
-            <Table className="min-w-[920px]">
-              <TableHeader>
+            <Table className="min-w-[880px] [&_[data-slot=table-cell]]:px-2.5 [&_[data-slot=table-head]]:px-2.5">
+              <TableHeader className="[&>tr]:bg-card/95 backdrop-blur">
                 <TableRow className="hover:bg-transparent">
                   <TableHead>Company</TableHead>
                   <TableHead>Industry</TableHead>

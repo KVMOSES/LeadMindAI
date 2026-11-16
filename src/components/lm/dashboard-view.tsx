@@ -132,7 +132,7 @@ function PanelCard({
     <CardContent className="relative z-10 p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-sm font-medium">{title}</h2>
+          <h2 className="lm-card-title">{title}</h2>
           {subtitle && <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>}
         </div>
         {actions && <div className="shrink-0">{actions}</div>}
@@ -157,8 +157,8 @@ function PanelCard({
 function ModelMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="px-3 py-2.5 text-center">
-      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-0.5 text-sm font-semibold tabular-nums">{value}</p>
+      <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
+      <p className="lm-metric mt-1 text-[15px] text-foreground">{value}</p>
     </div>
   );
 }
@@ -272,7 +272,7 @@ export function DashboardView({ session }: { session: SessionData }) {
   }, [data, sortedIndustries]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         eyebrow="Command Center"
         title="Pipeline intelligence"
