@@ -16,7 +16,9 @@ import {
   RefreshCcw,
   Search,
   Send,
+  ShieldCheck,
   ShieldQuestion,
+  Sparkles,
   Terminal,
   TrendingUp,
   User,
@@ -128,6 +130,17 @@ export function expandSlashCommand(text: string): string {
   return rest ? `${base}. Details: ${rest}` : base;
 }
 
+/** Visual-only icon for a backend suggestion chip, matched by keyword. */
+function iconForSuggestion(s: string): React.ComponentType<{ className?: string }> {
+  const t = s.toLowerCase();
+  if (t.includes("qualif") || t.includes("sales ready")) return ListChecks;
+  if (t.includes("contact") || t.includes("today") || t.includes("next") || t.includes("action")) return Zap;
+  if (t.includes("industry") || t.includes("conversion") || t.includes("best") || t.includes("insight") || t.includes("trend") || t.includes("performing")) return TrendingUp;
+  if (t.includes("model") || t.includes("evaluation") || t.includes("score") || t.includes("predict")) return BrainCircuit;
+  if (t.includes("quality") || t.includes("problem") || t.includes("duplicate") || t.includes("missing")) return Wrench;
+  return Search;
+}
+
 // ── Animation helpers ────────────────────────────────────────────────────────
 
 const MESSAGE_VARIANTS = {
@@ -156,50 +169,49 @@ function TypingDots({ className }: { className?: string }) {
   );
 }
 
-// ── Tool activity panel ──────────────────────────────────────────────────────
+// ── Tool activity panel (grounded-evidence strip) ────────────────────────────
 
 function ToolTracePanel({ traces }: { traces: ToolTrace[] }) {
   const [open, setOpen] = React.useState(false);
   const allOk = traces.every((t) => t.ok);
+  const totalMs = traces.reduce((acc, t) => acc + t.ms, 0);
   return (
-    <div className="w-full overflow-hidden rounded-xl border border-border/70 bg-background/40 backdrop-blur-sm">
+    <div className="w-full overflow-hidden rounded-xl border border-[var(--lm-brand)]/25 bg-[linear-gradient(115deg,var(--lm-brand-soft),transparent_68%)] backdrop-blur-sm">
       <button
         type="button"
-        className="flex w-full flex-wrap items-center gap-1.5 px-3 py-2 text-left text-xs"
+        className="flex w-full flex-wrap items-center gap-2 px-3 py-2 text-left text-xs transition-colors hover:bg-[var(--lm-brand-soft)]/60"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
-        <span className="flex items-center gap-1.5 font-medium">
-          <span
-            className={cn(
-              "flex size-5 shrink-0 items-center justify-center rounded-md ring-1",
-              allOk
-                ? "bg-[var(--lm-brand-soft)] ring-[var(--lm-brand)]/25"
-                : "bg-rose-500/10 ring-rose-500/30",
-            )}
-          >
-            <Wrench className={cn("size-3", allOk ? "text-[var(--lm-brand)]" : "text-rose-500")} aria-hidden="true" />
-          </span>
+        <span
+          className={cn(
+            "flex size-5 shrink-0 items-center justify-center rounded-md ring-1",
+            allOk ? "bg-[var(--lm-brand)]/15 ring-[var(--lm-brand)]/30" : "bg-rose-500/10 ring-rose-500/30",
+          )}
+        >
+          <Wrench className={cn("size-3", allOk ? "text-[var(--lm-brand)]" : "text-rose-500")} aria-hidden="true" />
+        </span>
+        <span className="font-medium">
           {traces.length} tool execution{traces.length > 1 ? "s" : ""}
         </span>
-        <span className="flex max-w-full flex-wrap items-center gap-1">
+        <span className="hidden max-w-full flex-wrap items-center gap-1 sm:flex">
           {traces.slice(0, 3).map((t, i) => (
             <span
               key={i}
-              className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+              className="inline-flex items-center gap-1 rounded-full border border-[var(--lm-brand)]/20 bg-background/50 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
             >
               {t.name}
               <span className={cn("size-1 rounded-full", t.ok ? "bg-emerald-500" : "bg-rose-500")} aria-hidden="true" />
             </span>
           ))}
           {traces.length > 3 && (
-            <span className="rounded-full border border-border/60 bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+            <span className="rounded-full border border-[var(--lm-brand)]/20 bg-background/50 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
               +{traces.length - 3}
             </span>
           )}
         </span>
-        <span className="ml-auto inline-flex items-center gap-1.5 text-[10px] text-muted-foreground">
-          {open ? "hide" : "evidence"}
+        <span className="ml-auto inline-flex items-center gap-1.5 font-mono text-[10px] tabular-nums text-muted-foreground">
+          {totalMs}ms
           <ChevronDown className={cn("size-3 transition-transform", open && "rotate-180")} aria-hidden="true" />
         </span>
       </button>
@@ -212,7 +224,7 @@ function ToolTracePanel({ traces }: { traces: ToolTrace[] }) {
             transition={{ duration: 0.18 }}
             className="overflow-hidden"
           >
-            <div className="space-y-2 border-t border-border/70 px-3 py-2.5">
+            <div className="space-y-2 border-t border-[var(--lm-brand)]/20 px-3 py-2.5">
               {traces.map((t, i) => (
                 <div key={i} className="flex items-start gap-2">
                   <span
@@ -227,7 +239,8 @@ function ToolTracePanel({ traces }: { traces: ToolTrace[] }) {
                   </div>
                 </div>
               ))}
-              <p className="border-t border-border/60 pt-2 text-[10px] text-muted-foreground/80">
+              <p className="flex items-center gap-1.5 border-t border-[var(--lm-brand)]/15 pt-2 text-[10px] text-muted-foreground/85">
+                <ShieldCheck className="size-3 shrink-0 text-[var(--lm-lime)]" aria-hidden="true" />
                 Every claim in the answer above is grounded in these validated tool results — no fabricated records.
               </p>
             </div>
@@ -309,6 +322,107 @@ function CommandPalette({ visible, activeIndex, items, onSelect }: CommandPalett
           ))}
         </ul>
       )}
+    </motion.div>
+  );
+}
+
+// ── Empty-state hero ─────────────────────────────────────────────────────────
+
+function EmptyHero({
+  suggestions,
+  sending,
+  onSuggestion,
+  onCommand,
+}: {
+  suggestions: string[];
+  sending: boolean;
+  onSuggestion: (text: string) => void;
+  onCommand: (cmd: CopilotCommand) => void;
+}) {
+  const reduced = useReducedMotion();
+  return (
+    <motion.div
+      className="relative flex flex-col items-center px-2 py-8 text-center sm:py-10"
+      initial={reduced ? false : { opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+    >
+      {/* Breathing halo behind the signal mark */}
+      <div className="relative mb-6">
+        <span
+          aria-hidden="true"
+          className="lm-halo absolute left-1/2 top-1/2 -z-10 size-44 rounded-full blur-xl"
+          style={{ background: "radial-gradient(closest-side, var(--lm-brand-soft), transparent 78%)" }}
+        />
+        <span
+          aria-hidden="true"
+          className="absolute left-1/2 top-1/2 -z-10 size-28 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[var(--lm-brand)]/20"
+        />
+        <span
+          aria-hidden="true"
+          className="absolute left-1/2 top-1/2 -z-10 size-44 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[var(--lm-brand)]/10"
+        />
+        <LogoMark size={64} />
+      </div>
+
+      <p className="lm-eyebrow mb-2">
+        <Sparkles className="size-3" aria-hidden="true" />
+        AI Copilot
+      </p>
+      <h1 className="font-display text-[1.65rem] font-bold leading-tight tracking-tight sm:text-3xl">
+        Ask your pipeline <span className="lm-brand-text">anything</span>
+      </h1>
+      <p className="mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
+        The Copilot investigates real workspace data through validated tools — lead search,
+        scoring explanations, analytics, recommendations and knowledge retrieval. It never
+        invents records.
+      </p>
+
+      {suggestions.length > 0 && (
+        <div className="mt-6 grid w-full max-w-xl gap-2 text-left sm:grid-cols-2">
+          {suggestions.slice(0, 6).map((s, i) => {
+            const Icon = iconForSuggestion(s);
+            return (
+              <motion.button
+                key={`${s}-${i}`}
+                type="button"
+                onClick={() => onSuggestion(s)}
+                disabled={sending}
+                className="group flex items-center gap-2.5 rounded-xl border border-border/60 bg-card/60 px-3 py-2.5 text-[13px] leading-snug text-muted-foreground backdrop-blur transition-all hover:border-[var(--lm-brand)]/45 hover:bg-[var(--lm-brand-soft)] hover:text-foreground hover:shadow-[0_8px_26px_-12px_var(--lm-brand)] disabled:opacity-50"
+                initial={reduced ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: reduced ? 0 : 0.18 + i * 0.055, duration: 0.3 }}
+              >
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground transition-colors group-hover:bg-[var(--lm-brand)]/15 group-hover:text-[var(--lm-brand)]">
+                  <Icon className="size-3.5" aria-hidden="true" />
+                </span>
+                <span className="min-w-0 flex-1">{s}</span>
+              </motion.button>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5" aria-label="Slash command shortcuts">
+        {COPILOT_COMMANDS.filter((c) => !c.send).map((c) => (
+          <button
+            key={c.command}
+            type="button"
+            disabled={sending}
+            onClick={() => onCommand(c)}
+            title={`${c.label} — ${c.hint}`}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-muted/30 px-2 py-1 font-mono text-[10.5px] text-muted-foreground transition-colors hover:border-[var(--lm-brand)]/40 hover:text-[var(--lm-brand)] disabled:opacity-50"
+          >
+            <c.icon className="size-3" aria-hidden="true" />
+            {c.command}
+          </button>
+        ))}
+      </div>
+
+      <p className="mt-5 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground/85">
+        <ShieldCheck className="size-3.5 text-[var(--lm-lime)]" aria-hidden="true" />
+        Answers are grounded in validated tool output — nothing is fabricated
+      </p>
     </motion.div>
   );
 }
@@ -475,10 +589,41 @@ export function AnimatedAiChat({
 
   return (
     <div className={cn("flex h-full min-h-0 w-full min-w-0 flex-col", className)} data-chat-surface="">
-      {/* ── Chat toolbar ──────────────────────────────────────────────────── */}
-      <div className="relative z-10 flex items-center justify-between gap-3 border-b border-border/70 px-4 py-2.5 sm:px-5">
+      {/* ── Animated ambience (scoped, decorative) ─────────────────────────── */}
+      <div className="lm-chat-aurora" aria-hidden="true" />
+
+      {/* ── Streaming progress bar ─────────────────────────────────────────── */}
+      <AnimatePresence>
+        {sending && (
+          <motion.div
+            key="streambar"
+            initial={reduced ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-x-0 top-0 z-20 h-0.5 overflow-hidden"
+            aria-hidden="true"
+          >
+            <div
+              className={cn(
+                "h-full w-1/3 rounded-full bg-gradient-to-r from-transparent via-[var(--lm-brand)] to-transparent",
+                !reduced && "lm-indeterminate",
+              )}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Chat toolbar ───────────────────────────────────────────────────── */}
+      <header className="relative z-10 flex items-center justify-between gap-3 border-b border-border/70 bg-background/30 px-4 py-2.5 backdrop-blur-md sm:px-5">
         <div className="flex min-w-0 items-center gap-2.5">
-          <LogoMark size={28} />
+          <span className="relative flex items-center">
+            <span
+              aria-hidden="true"
+              className="absolute inset-0 -z-10 rounded-xl blur-md"
+              style={{ background: "radial-gradient(closest-side, var(--lm-brand-soft), transparent)" }}
+            />
+            <LogoMark size={30} />
+          </span>
           <div className="min-w-0">
             <p className="truncate font-display text-sm font-bold leading-tight">LeadMind Copilot</p>
             {conversationTitle ? (
@@ -540,12 +685,12 @@ export function AnimatedAiChat({
           )}
           {headerActions}
         </div>
-      </div>
+      </header>
 
-      {/* ── Message stream ────────────────────────────────────────────────── */}
+      {/* ── Message stream ─────────────────────────────────────────────────── */}
       <div className="relative min-h-0 flex-1">
         <div ref={scrollRef} onScroll={handleScroll} className="lm-scroll absolute inset-0 overflow-y-auto">
-          <div className="relative z-10 mx-auto w-full max-w-[54rem] space-y-5 px-4 py-5 sm:px-6 sm:py-6">
+          <div className="relative z-10 mx-auto w-full max-w-3xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
             {loadingThread ? (
               <div className="space-y-4" aria-label="Loading conversation">
                 {[0, 1, 2].map((i) => (
@@ -560,60 +705,12 @@ export function AnimatedAiChat({
                 ))}
               </div>
             ) : messages.length === 0 ? (
-              <motion.div
-                className="flex flex-col items-center px-2 py-10 text-center sm:py-14"
-                initial={reduced ? false : { opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4 }}
-              >
-                <div className="relative mb-5">
-                  <div
-                    aria-hidden="true"
-                    className="absolute inset-0 -z-10 rounded-full blur-2xl"
-                    style={{ background: "radial-gradient(closest-side, var(--lm-brand-soft), transparent)" }}
-                  />
-                  <LogoMark size={60} />
-                </div>
-                <p className="font-display text-lg font-bold tracking-tight sm:text-xl">Ask your pipeline anything</p>
-                <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
-                  The Copilot investigates real workspace data through validated tools — lead search,
-                  scoring explanations, analytics, recommendations and knowledge retrieval. It never
-                  invents records.
-                </p>
-                {suggestions.length > 0 && (
-                  <div className="mt-6 flex max-w-2xl flex-wrap justify-center gap-2">
-                    {suggestions.map((s, i) => (
-                      <motion.button
-                        key={i}
-                        type="button"
-                        onClick={() => onSend(expandSlashCommand(s))}
-                        disabled={sending}
-                        className="rounded-full border bg-background/60 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur transition-colors hover:border-[var(--lm-brand)]/40 hover:text-[var(--lm-brand)] disabled:opacity-50"
-                        initial={reduced ? false : { opacity: 0, y: 6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.15 + i * 0.05, duration: 0.3 }}
-                      >
-                        {s}
-                      </motion.button>
-                    ))}
-                  </div>
-                )}
-                <div className="mt-5 flex flex-wrap items-center justify-center gap-1.5" aria-label="Slash command shortcuts">
-                  {COPILOT_COMMANDS.filter((c) => !c.send).map((c) => (
-                    <button
-                      key={c.command}
-                      type="button"
-                      disabled={sending}
-                      onClick={() => selectCommand(c)}
-                      title={`${c.label} — ${c.hint}`}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-muted/30 px-2 py-1 font-mono text-[10.5px] text-muted-foreground transition-colors hover:border-[var(--lm-brand)]/40 hover:text-[var(--lm-brand)] disabled:opacity-50"
-                    >
-                      <c.icon className="size-3" aria-hidden="true" />
-                      {c.command}
-                    </button>
-                  ))}
-                </div>
-              </motion.div>
+              <EmptyHero
+                suggestions={suggestions}
+                sending={sending}
+                onSuggestion={(s) => onSend(expandSlashCommand(s))}
+                onCommand={selectCommand}
+              />
             ) : (
               <AnimatePresence initial={false} mode="popLayout">
                 {messages.map((m) => (
@@ -624,17 +721,19 @@ export function AnimatedAiChat({
                     initial={reduced ? false : "hidden"}
                     animate="show"
                     exit="exit"
-                    className={cn("flex gap-3", m.role === "USER" ? "justify-end" : "justify-start")}
+                    className={cn("group/msg flex gap-3", m.role === "USER" ? "justify-end" : "justify-start")}
                   >
                     {m.role === "ASSISTANT" && (
-                      <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-[var(--lm-brand-soft)] ring-1 ring-[var(--lm-brand)]/25">
-                        <LogoMark size={18} badge={false} />
+                      <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl bg-[var(--lm-brand-soft)] ring-1 ring-[var(--lm-brand)]/30">
+                        <LogoMark size={20} badge={false} />
                       </div>
                     )}
                     <div
                       className={cn(
                         "min-w-0 space-y-2",
-                        m.role === "USER" ? "flex max-w-[85%] flex-col items-end sm:max-w-[75%]" : "w-full min-w-0 max-w-[calc(100%-2.25rem)] sm:max-w-[calc(100%-2.5rem)]",
+                        m.role === "USER"
+                          ? "flex max-w-[85%] flex-col items-end sm:max-w-[72%]"
+                          : "w-full min-w-0 max-w-[calc(100%-2.5rem)]",
                       )}
                     >
                       {m.toolTraces.length > 0 && <ToolTracePanel traces={m.toolTraces} />}
@@ -642,8 +741,8 @@ export function AnimatedAiChat({
                         className={cn(
                           "text-sm",
                           m.role === "USER"
-                            ? "rounded-2xl rounded-br-md bg-[linear-gradient(135deg,var(--lm-brand),color-mix(in_oklab,var(--lm-brand),var(--lm-info)_35%))] px-4 py-3 text-white shadow-[0_6px_18px_-8px_var(--lm-brand)]"
-                            : "rounded-2xl rounded-bl-md border border-border/70 bg-card/85 px-4 py-3.5 backdrop-blur-md sm:px-5",
+                            ? "rounded-2xl rounded-br-md bg-[linear-gradient(135deg,var(--lm-brand),color-mix(in_oklab,var(--lm-brand),var(--lm-info)_35%))] px-4 py-3 text-white shadow-[0_8px_26px_-10px_var(--lm-brand)]"
+                            : "rounded-2xl rounded-bl-md border border-border/60 bg-card/80 px-4 py-3.5 shadow-[0_6px_24px_-14px_rgba(0,0,0,0.45)] backdrop-blur-md sm:px-5 sm:py-4",
                           m.streaming && m.content.length === 0 && "animate-pulse",
                         )}
                       >
@@ -659,8 +758,10 @@ export function AnimatedAiChat({
                           </div>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 px-1 text-[10px] text-muted-foreground">
-                        <span>{new Date(m.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                      <div className="flex items-center gap-2 px-1 text-[10px] text-muted-foreground/85">
+                        <span className="tabular-nums">
+                          {new Date(m.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        </span>
                         {m.role === "ASSISTANT" && !m.streaming && m.content.length > 0 && (
                           <button
                             type="button"
@@ -689,8 +790,8 @@ export function AnimatedAiChat({
                       </div>
                     </div>
                     {m.role === "USER" && (
-                      <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-muted">
-                        <User className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                      <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,var(--lm-brand),var(--lm-info))] text-white">
+                        <User className="h-4 w-4" aria-hidden="true" />
                       </div>
                     )}
                   </motion.div>
@@ -707,23 +808,27 @@ export function AnimatedAiChat({
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.98 }}
                   transition={{ duration: 0.22 }}
-                  className="mx-auto w-full max-w-lg overflow-hidden rounded-xl border border-amber-500/40 bg-amber-50/80 backdrop-blur-md dark:bg-amber-950/30"
+                  className="relative mx-auto w-full max-w-lg overflow-hidden rounded-2xl border border-amber-500/45 bg-amber-50/85 shadow-[0_12px_40px_-16px_rgba(245,158,11,0.45)] backdrop-blur-md dark:bg-amber-950/30"
                   role="alertdialog"
                   aria-label="Confirmation required"
                 >
-                  <div className="space-y-3 p-4">
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-400/70 to-transparent"
+                  />
+                  <div className="space-y-3 p-4 sm:p-5">
                     <div className="flex items-center gap-2 text-sm font-medium">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-md bg-amber-500/15">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/15 ring-1 ring-amber-500/30">
                         <ShieldQuestion className="h-4 w-4 text-amber-600 dark:text-amber-400" aria-hidden="true" />
                       </span>
                       Confirmation required
                     </div>
                     <p className="text-sm leading-relaxed text-muted-foreground">{pending.summary}</p>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2 pt-0.5">
                       <Button
                         size="sm"
                         onClick={() => onResolvePending("confirm")}
-                        className="bg-amber-600 text-white hover:bg-amber-500"
+                        className="bg-amber-600 text-white shadow-[0_6px_18px_-8px_rgba(245,158,11,0.7)] hover:bg-amber-500"
                       >
                         <Check className="mr-1 h-3.5 w-3.5" aria-hidden="true" /> Confirm &amp; execute
                       </Button>
@@ -785,9 +890,9 @@ export function AnimatedAiChat({
         </AnimatePresence>
       </div>
 
-      {/* ── Composer ──────────────────────────────────────────────────────── */}
-      <div className="relative z-10 border-t border-border/70 p-3 sm:px-5">
-        <div className="relative mx-auto w-full max-w-[54rem]">
+      {/* ── Composer ───────────────────────────────────────────────────────── */}
+      <div className="relative z-10 border-t border-border/70 bg-background/30 p-3 backdrop-blur-md sm:px-5 sm:pb-4">
+        <div className="relative mx-auto w-full max-w-3xl">
           <CommandPalette
             visible={paletteOpen}
             activeIndex={activeCmdIndex}
@@ -795,7 +900,13 @@ export function AnimatedAiChat({
             onSelect={selectCommand}
           />
 
-          <div className="flex items-end gap-2 rounded-xl border border-border/70 bg-card/70 p-2 shadow-sm backdrop-blur-md transition-[border-color,box-shadow] focus-within:border-[var(--lm-brand)]/40 focus-within:shadow-[0_0_0_3px_var(--lm-brand-soft)]">
+          <div
+            className={cn(
+              "flex items-end gap-2 rounded-2xl border border-border/70 bg-card/80 p-2 backdrop-blur-xl transition-[border-color,box-shadow] duration-200",
+              "shadow-[0_12px_40px_-18px_rgba(0,0,0,0.55)]",
+              "focus-within:border-[var(--lm-brand)]/45 focus-within:shadow-[0_0_0_4px_var(--lm-brand-soft),0_18px_48px_-16px_var(--lm-brand)]",
+            )}
+          >
             <Textarea
               ref={textareaRef}
               value={input}
@@ -805,14 +916,14 @@ export function AnimatedAiChat({
               rows={1}
               maxLength={MAX_MESSAGE_LENGTH}
               aria-label="Message the copilot"
-              className="max-h-[180px] min-h-[2.25rem] flex-1 resize-none border-0 bg-transparent px-2 py-1.5 text-sm shadow-none focus-visible:ring-0"
+              className="max-h-[180px] min-h-[2.5rem] flex-1 resize-none border-0 bg-transparent px-2.5 py-2 text-sm shadow-none placeholder:text-muted-foreground/70 focus-visible:ring-0 sm:text-[0.9rem]"
               disabled={sending}
             />
-            <div className="flex shrink-0 flex-col items-end gap-1">
+            <div className="flex shrink-0 items-center gap-1.5 pb-0.5 pr-0.5">
               {nearLimit && (
                 <span
                   className={cn(
-                    "font-mono text-[9.5px] tabular-nums",
+                    "self-center font-mono text-[9.5px] tabular-nums",
                     input.length >= MAX_MESSAGE_LENGTH ? "text-rose-500" : "text-muted-foreground",
                   )}
                   aria-live="polite"
@@ -848,7 +959,7 @@ export function AnimatedAiChat({
           </div>
         </div>
 
-        <p className="mx-auto mt-1.5 hidden max-w-[54rem] items-center gap-3 px-1 text-[10px] text-muted-foreground sm:flex">
+        <p className="mx-auto mt-1.5 hidden max-w-3xl items-center gap-3 px-1 text-[10px] text-muted-foreground sm:flex">
           <span className="inline-flex items-center gap-1">
             <kbd className="rounded border bg-muted px-1 font-mono text-[9px]">/</kbd> commands
           </span>

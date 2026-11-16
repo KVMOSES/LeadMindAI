@@ -1,0 +1,870 @@
+     1→"use client";
+     2→
+     3→import * as React from "react";
+     4→import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+     5→import {
+     6→  ArrowDown,
+     7→  BrainCircuit,
+     8→  Check,
+     9→  ChevronDown,
+    10→  Copy,
+    11→  CornerDownLeft,
+    12→  HelpCircle,
+    13→  Layers,
+    14→  ListChecks,
+    15→  Loader2,
+    16→  RefreshCcw,
+    17→  Search,
+    18→  Send,
+    19→  ShieldQuestion,
+    20→  Terminal,
+    21→  TrendingUp,
+    22→  User,
+    23→  Wrench,
+    24→  X,
+    25→  Zap,
+    26→} from "lucide-react";
+    27→import { toast } from "sonner";
+    28→import { cn } from "@/lib/utils";
+    29→import { Button } from "@/components/ui/button";
+    30→import { LiquidGlassButton } from "@/components/ui/liquid-glass-button";
+    31→import { Textarea } from "@/components/ui/textarea";
+    32→import { Markdown } from "@/components/lm/shared";
+    33→import { LogoMark } from "@/components/lm/logo";
+    34→
+    35→/**
+    36→ * AnimatedAiChat — presentation layer for the LeadMind Copilot.
+    37→ *
+    38→ * This component renders the animated chat surface (message stream, typing
+    39→ * indicator, tool activity, confirmation gate, composer with a `/` command
+    40→ * palette). It contains **no AI logic of its own**: streaming, persistence,
+    41→ * permissions and tool execution are owned by the existing backend and wired
+    42→ * in through the callbacks below by `copilot-view.tsx`.
+    43→ *
+    44→ * Notes:
+    45→ * - Sizes to its container (never `min-h-screen` / `w-screen`) so it lives
+    46→ *   inside the application shell.
+    47→ * - Framer Motion is used for entrance/exit transitions only; all animations
+    48→ *   are disabled under `prefers-reduced-motion`.
+    49→ * - No attachment controls: the current backend has no file-upload endpoint,
+    50→ *   so none are rendered (no fake uploads).
+    51→ * - Composer enforces the real backend limit (4000 characters).
+    52→ */
+    53→
+    54→// ── Shared types (consumed by copilot-view) ──────────────────────────────────
+    55→
+    56→export interface ToolTrace {
+    57→  name: string;
+    58→  args: Record<string, unknown>;
+    59→  ok: boolean;
+    60→  summary: string;
+    61→  ms: number;
+    62→}
+    63→
+    64→export interface ChatMsg {
+    65→  id: string;
+    66→  role: "USER" | "ASSISTANT";
+    67→  content: string;
+    68→  toolTraces: ToolTrace[];
+    69→  createdAt: string;
+    70→  streaming?: boolean;
+    71→}
+    72→
+    73→export interface PendingCard {
+    74→  pendingActionId: string;
+    75→  summary: string;
+    76→}
+    77→
+    78→export interface CopilotCommand {
+    79→  command: string;
+    80→  label: string;
+    81→  hint: string;
+    82→  icon: React.ComponentType<{ className?: string }>;
+    83→  /** Text placed in the composer when selected. */
+    84→  template: string;
+    85→  /** When set, the message is sent immediately instead of filling the composer. */
+    86→  send?: string;
+    87→}
+    88→
+    89→/** Real backend limit for a single chat message (see messages route zod schema). */
+    90→const MAX_MESSAGE_LENGTH = 4000;
+    91→
+    92→/**
+    93→ * Commands map to capabilities that actually exist in the Copilot tool
+    94→ * protocol (search_leads, qualification, assessments, dashboard metrics,
+    95→ * recommendations, engagement trends, knowledge search, help).
+    96→ */
+    97→export const COPILOT_COMMANDS: CopilotCommand[] = [
+    98→  { command: "/leads", label: "Search leads", hint: "Find prospects matching a query or filters", icon: Search, template: "/leads " },
+    99→  { command: "/qualify", label: "Qualify a prospect", hint: "Assess whether a lead is sales ready", icon: ListChecks, template: "/qualify " },
+   100→  { command: "/analyze", label: "Analyse a lead", hint: "Scores, predictions and why they look that way", icon: BrainCircuit, template: "/analyze " },
+   101→  { command: "/pipeline", label: "Summarise pipeline", hint: "Counts, conversion estimates and distribution", icon: Layers, template: "/pipeline " },
+   102→  { command: "/next-action", label: "Next best action", hint: "Highest-priority recommended plays", icon: Zap, template: "/next-action " },
+   103→  { command: "/insights", label: "Generate sales insights", hint: "Trends across engagement and industries", icon: TrendingUp, template: "/insights " },
+   104→  { command: "/help", label: "Show Copilot capabilities", hint: "What the assistant can and cannot do", icon: HelpCircle, template: "", send: "What can you do? List your capabilities and the tools you use.", },
+   105→];
+   106→
+   107→/**
+   108→ * Slash commands are expanded into natural-language prompts before they reach
+   109→ * the Copilot, so the assistant reliably triggers the matching capability
+   110→ * regardless of how it interprets literal "/command" text.
+   111→ */
+   112→const COMMAND_EXPANSIONS: Record<string, string> = {
+   113→  "/leads": "Search my leads",
+   114→  "/qualify": "Qualify a prospect for me",
+   115→  "/analyze": "Analyse a lead for me",
+   116→  "/pipeline": "Summarise my current pipeline — counts, conversion estimates and distribution",
+   117→  "/next-action": "What is the next best action I should take right now?",
+   118→  "/insights": "Generate sales insights from my workspace data",
+   119→  "/help": "What can you do? List your capabilities and the tools you use.",
+   120→};
+   121→
+   122→export function expandSlashCommand(text: string): string {
+   123→  const match = text.match(/^\/([a-zA-Z]+)\s*([\s\S]*)$/);
+   124→  if (!match) return text;
+   125→  const base = COMMAND_EXPANSIONS[`/${match[1].toLowerCase()}`];
+   126→  if (!base) return text;
+   127→  const rest = match[2].trim();
+   128→  return rest ? `${base}. Details: ${rest}` : base;
+   129→}
+   130→
+   131→// ── Animation helpers ────────────────────────────────────────────────────────
+   132→
+   133→const MESSAGE_VARIANTS = {
+   134→  hidden: { opacity: 0, y: 12, scale: 0.985 },
+   135→  show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] as const } },
+   136→  exit: { opacity: 0, scale: 0.97, transition: { duration: 0.16 } },
+   137→};
+   138→
+   139→function TypingDots({ className }: { className?: string }) {
+   140→  const reduced = useReducedMotion();
+   141→  return (
+   142→    <span className={cn("inline-flex items-center gap-1", className)} aria-hidden="true">
+   143→      {[0, 1, 2].map((i) =>
+   144→        reduced ? (
+   145→          <span key={i} className="h-1.5 w-1.5 rounded-full bg-[var(--lm-brand)]/70" />
+   146→        ) : (
+   147→          <motion.span
+   148→            key={i}
+   149→            className="h-1.5 w-1.5 rounded-full bg-[var(--lm-brand)]/70"
+   150→            animate={{ y: [0, -3, 0], opacity: [0.55, 1, 0.55] }}
+   151→            transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.15, ease: "easeInOut" }}
+   152→          />
+   153→        ),
+   154→      )}
+   155→    </span>
+   156→  );
+   157→}
+   158→
+   159→// ── Tool activity panel ──────────────────────────────────────────────────────
+   160→
+   161→function ToolTracePanel({ traces }: { traces: ToolTrace[] }) {
+   162→  const [open, setOpen] = React.useState(false);
+   163→  const allOk = traces.every((t) => t.ok);
+   164→  return (
+   165→    <div className="w-full overflow-hidden rounded-xl border border-border/70 bg-background/40 backdrop-blur-sm">
+   166→      <button
+   167→        type="button"
+   168→        className="flex w-full flex-wrap items-center gap-1.5 px-3 py-2 text-left text-xs"
+   169→        onClick={() => setOpen((v) => !v)}
+   170→        aria-expanded={open}
+   171→      >
+   172→        <span className="flex items-center gap-1.5 font-medium">
+   173→          <span
+   174→            className={cn(
+   175→              "flex size-5 shrink-0 items-center justify-center rounded-md ring-1",
+   176→              allOk
+   177→                ? "bg-[var(--lm-brand-soft)] ring-[var(--lm-brand)]/25"
+   178→                : "bg-rose-500/10 ring-rose-500/30",
+   179→            )}
+   180→          >
+   181→            <Wrench className={cn("size-3", allOk ? "text-[var(--lm-brand)]" : "text-rose-500")} aria-hidden="true" />
+   182→          </span>
+   183→          {traces.length} tool execution{traces.length > 1 ? "s" : ""}
+   184→        </span>
+   185→        <span className="flex max-w-full flex-wrap items-center gap-1">
+   186→          {traces.slice(0, 3).map((t, i) => (
+   187→            <span
+   188→              key={i}
+   189→              className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+   190→            >
+   191→              {t.name}
+   192→              <span className={cn("size-1 rounded-full", t.ok ? "bg-emerald-500" : "bg-rose-500")} aria-hidden="true" />
+   193→            </span>
+   194→          ))}
+   195→          {traces.length > 3 && (
+   196→            <span className="rounded-full border border-border/60 bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+   197→              +{traces.length - 3}
+   198→            </span>
+   199→          )}
+   200→        </span>
+   201→        <span className="ml-auto inline-flex items-center gap-1.5 text-[10px] text-muted-foreground">
+   202→          {open ? "hide" : "evidence"}
+   203→          <ChevronDown className={cn("size-3 transition-transform", open && "rotate-180")} aria-hidden="true" />
+   204→        </span>
+   205→      </button>
+   206→      <AnimatePresence initial={false}>
+   207→        {open && (
+   208→          <motion.div
+   209→            initial={{ height: 0, opacity: 0 }}
+   210→            animate={{ height: "auto", opacity: 1 }}
+   211→            exit={{ height: 0, opacity: 0 }}
+   212→            transition={{ duration: 0.18 }}
+   213→            className="overflow-hidden"
+   214→          >
+   215→            <div className="space-y-2 border-t border-border/70 px-3 py-2.5">
+   216→              {traces.map((t, i) => (
+   217→                <div key={i} className="flex items-start gap-2">
+   218→                  <span
+   219→                    className={cn("mt-1.5 size-1.5 shrink-0 rounded-full", t.ok ? "bg-emerald-500" : "bg-rose-500")}
+   220→                    aria-hidden="true"
+   221→                  />
+   222→                  <div className="min-w-0 flex-1">
+   223→                    <p className="font-mono text-[11px] font-medium">
+   224→                      {t.name} <span className="font-sans font-normal text-muted-foreground">· {t.ms}ms</span>
+   225→                    </p>
+   226→                    <p className="text-[11px] leading-relaxed text-muted-foreground">{t.summary}</p>
+   227→                  </div>
+   228→                </div>
+   229→              ))}
+   230→              <p className="border-t border-border/60 pt-2 text-[10px] text-muted-foreground/80">
+   231→                Every claim in the answer above is grounded in these validated tool results — no fabricated records.
+   232→              </p>
+   233→            </div>
+   234→          </motion.div>
+   235→        )}
+   236→      </AnimatePresence>
+   237→    </div>
+   238→  );
+   239→}
+   240→
+   241→// ── Command palette ──────────────────────────────────────────────────────────
+   242→
+   243→interface CommandPaletteProps {
+   244→  visible: boolean;
+   245→  activeIndex: number;
+   246→  items: CopilotCommand[];
+   247→  onSelect: (cmd: CopilotCommand) => void;
+   248→}
+   249→
+   250→function CommandPalette({ visible, activeIndex, items, onSelect }: CommandPaletteProps) {
+   251→  if (!visible) return null;
+   252→  return (
+   253→    <motion.div
+   254→      initial={{ opacity: 0, y: 6, scale: 0.99 }}
+   255→      animate={{ opacity: 1, y: 0, scale: 1 }}
+   256→      transition={{ duration: 0.15 }}
+   257→      className="absolute bottom-full left-0 right-0 z-20 mb-2 overflow-hidden rounded-xl border bg-popover/95 shadow-xl backdrop-blur-md"
+   258→      role="listbox"
+   259→      aria-label="Copilot commands"
+   260→    >
+   261→      <div className="border-b px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+   262→        Copilot commands
+   263→      </div>
+   264→      {items.length === 0 ? (
+   265→        <p className="px-3 py-4 text-center text-xs text-muted-foreground">No matching command</p>
+   266→      ) : (
+   267→        <ul className="lm-scroll max-h-64 overflow-y-auto p-1.5">
+   268→          {items.map((cmd, i) => (
+   269→            <li
+   270→              key={cmd.command}
+   271→              id={`copilot-cmd-${i}`}
+   272→              role="option"
+   273→              aria-selected={i === activeIndex}
+   274→              className="cursor-pointer"
+   275→              onMouseDown={(e) => {
+   276→                // mousedown (not click) so the textarea keeps focus
+   277→                e.preventDefault();
+   278→                onSelect(cmd);
+   279→              }}
+   280→            >
+   281→              <div
+   282→                className={cn(
+   283→                  "flex items-center gap-3 rounded-lg px-2.5 py-2 transition-colors",
+   284→                  i === activeIndex ? "bg-[var(--lm-brand-soft)]" : "hover:bg-muted",
+   285→                )}
+   286→              >
+   287→                <span
+   288→                  className={cn(
+   289→                    "flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
+   290→                    i === activeIndex ? "bg-[var(--lm-brand)]/15 text-[var(--lm-brand)]" : "bg-muted text-muted-foreground",
+   291→                  )}
+   292→                >
+   293→                  <cmd.icon className="h-3.5 w-3.5" aria-hidden="true" />
+   294→                </span>
+   295→                <div className="min-w-0 flex-1">
+   296→                  <p className="text-sm font-medium">
+   297→                    <span className="font-mono text-[var(--lm-brand)]">{cmd.command}</span>
+   298→                    <span className="ml-2 font-sans">{cmd.label}</span>
+   299→                  </p>
+   300→                  <p className="truncate text-xs text-muted-foreground">{cmd.hint}</p>
+   301→                </div>
+   302→                {i === activeIndex && (
+   303→                  <span className="hidden shrink-0 items-center gap-1 text-[10px] text-muted-foreground sm:flex">
+   304→                    <CornerDownLeft className="h-3 w-3" aria-hidden="true" /> select
+   305→                  </span>
+   306→                )}
+   307→              </div>
+   308→            </li>
+   309→          ))}
+   310→        </ul>
+   311→      )}
+   312→    </motion.div>
+   313→  );
+   314→}
+   315→
+   316→// ── Main component ───────────────────────────────────────────────────────────
+   317→
+   318→export interface AnimatedAiChatProps {
+   319→  messages: ChatMsg[];
+   320→  loadingThread: boolean;
+   321→  sending: boolean;
+   322→  statusLine: string | null;
+   323→  pending: PendingCard | null;
+   324→  suggestions: string[];
+   325→  isDemo: boolean;
+   326→  contextLead: { id: string; label: string } | null;
+   327→  /** Title of the active conversation, shown in the toolbar when present. */
+   328→  conversationTitle?: string | null;
+   329→  onSend: (text: string) => void;
+   330→  onStop: () => void;
+   331→  onRetry: () => void;
+   332→  onResolvePending: (action: "confirm" | "cancel") => void;
+   333→  onOpenContextLead?: () => void;
+   334→  onClearContext?: () => void;
+   335→  /** Extra header actions (e.g. mobile conversation-list toggle). */
+   336→  headerActions?: React.ReactNode;
+   337→  /** Extra classes for the root element. */
+   338→  className?: string;
+   339→}
+   340→
+   341→export function AnimatedAiChat({
+   342→  messages,
+   343→  loadingThread,
+   344→  sending,
+   345→  statusLine,
+   346→  pending,
+   347→  suggestions,
+   348→  isDemo,
+   349→  contextLead,
+   350→  conversationTitle,
+   351→  onSend,
+   352→  onStop,
+   353→  onRetry,
+   354→  onResolvePending,
+   355→  onOpenContextLead,
+   356→  onClearContext,
+   357→  headerActions,
+   358→  className,
+   359→}: AnimatedAiChatProps) {
+   360→  const reduced = useReducedMotion();
+   361→
+   362→  const [input, setInput] = React.useState("");
+   363→  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+   364→  const scrollRef = React.useRef<HTMLDivElement>(null);
+   365→  const bottomRef = React.useRef<HTMLDivElement>(null);
+   366→  const [nearBottom, setNearBottom] = React.useState(true);
+   367→
+   368→  // ── Command palette state ────────────────────────────────────────────────
+   369→  const paletteOpen = input.startsWith("/") && !sending;
+   370→  const paletteQuery = paletteOpen ? input.slice(1).split(/\s/)[0]?.toLowerCase() ?? "" : "";
+   371→  const filteredCommands = React.useMemo(() => {
+   372→    if (!paletteOpen) return [];
+   373→    if (!paletteQuery) return COPILOT_COMMANDS;
+   374→    return COPILOT_COMMANDS.filter((c) => c.command.slice(1).startsWith(paletteQuery));
+   375→  }, [paletteOpen, paletteQuery]);
+   376→  const [activeCmdIndex, setActiveCmdIndex] = React.useState(0);
+   377→
+   378→  React.useEffect(() => {
+   379→    setActiveCmdIndex(0);
+   380→  }, [paletteQuery]);
+   381→
+   382→  // ── Auto-resizing composer ───────────────────────────────────────────────
+   383→  React.useLayoutEffect(() => {
+   384→    const el = textareaRef.current;
+   385→    if (!el) return;
+   386→    const resize = () => {
+   387→      el.style.height = "auto";
+   388→      el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
+   389→    };
+   390→    resize();
+   391→    // Re-measure when the viewport changes so the placeholder never clips.
+   392→    window.addEventListener("resize", resize);
+   393→    return () => window.removeEventListener("resize", resize);
+   394→  }, [input]);
+   395→
+   396→  // ── Scroll behaviour: follow only when the user is already at the bottom ──
+   397→  const handleScroll = React.useCallback(() => {
+   398→    const el = scrollRef.current;
+   399→    if (!el) return;
+   400→    setNearBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80);
+   401→  }, []);
+   402→
+   403→  React.useEffect(() => {
+   404→    if (nearBottom) {
+   405→      bottomRef.current?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "end" });
+   406→    }
+   407→  }, [messages, statusLine, nearBottom, reduced]);
+   408→
+   409→  const scrollToLatest = () => {
+   410→    bottomRef.current?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "end" });
+   411→  };
+   412→
+   413→  const submitInput = () => {
+   414→    const trimmed = input.trim();
+   415→    if (!trimmed || sending) return;
+   416→    setInput("");
+   417→    onSend(expandSlashCommand(trimmed));
+   418→  };
+   419→
+   420→  const selectCommand = (cmd: CopilotCommand) => {
+   421→    if (cmd.send) {
+   422→      setInput("");
+   423→      onSend(cmd.send);
+   424→      textareaRef.current?.focus();
+   425→      return;
+   426→    }
+   427→    setInput(cmd.template);
+   428→    requestAnimationFrame(() => {
+   429→      textareaRef.current?.focus();
+   430→      const el = textareaRef.current;
+   431→      if (el) el.selectionStart = el.selectionEnd = el.value.length;
+   432→    });
+   433→  };
+   434→
+   435→  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+   436→    const trimmedInput = input.trim();
+   437→    // Exact command match (e.g. "/pipeline") → Enter sends instead of re-selecting.
+   438→    const exactCommand =
+   439→      paletteOpen &&
+   440→      trimmedInput.length > 1 &&
+   441→      filteredCommands.some((c) => c.command === trimmedInput);
+   442→
+   443→    if (paletteOpen && filteredCommands.length > 0) {
+   444→      if (e.key === "ArrowDown") {
+   445→        e.preventDefault();
+   446→        setActiveCmdIndex((i) => (i + 1) % filteredCommands.length);
+   447→        return;
+   448→      }
+   449→      if (e.key === "ArrowUp") {
+   450→        e.preventDefault();
+   451→        setActiveCmdIndex((i) => (i - 1 + filteredCommands.length) % filteredCommands.length);
+   452→        return;
+   453→      }
+   454→      if ((e.key === "Enter" || e.key === "Tab") && !exactCommand) {
+   455→        e.preventDefault();
+   456→        selectCommand(filteredCommands[activeCmdIndex]);
+   457→        return;
+   458→      }
+   459→      if (e.key === "Escape") {
+   460→        e.preventDefault();
+   461→        setInput("");
+   462→        return;
+   463→      }
+   464→    }
+   465→    if (e.key === "Enter" && !e.shiftKey) {
+   466→      e.preventDefault();
+   467→      submitInput();
+   468→    }
+   469→  };
+   470→
+   471→  const lastMsg = messages[messages.length - 1];
+   472→  const lastAssistantErrored = lastMsg?.role === "ASSISTANT" && !lastMsg.streaming && lastMsg.content.startsWith("**Error:**");
+   473→  const canRetry = !sending && messages.some((m) => m.role === "USER");
+   474→  const nearLimit = input.length > MAX_MESSAGE_LENGTH - 400;
+   475→
+   476→  return (
+   477→    <div className={cn("flex h-full min-h-0 w-full min-w-0 flex-col", className)} data-chat-surface="">
+   478→      {/* ── Chat toolbar ──────────────────────────────────────────────────── */}
+   479→      <div className="relative z-10 flex items-center justify-between gap-3 border-b border-border/70 px-4 py-2.5 sm:px-5">
+   480→        <div className="flex min-w-0 items-center gap-2.5">
+   481→          <LogoMark size={28} />
+   482→          <div className="min-w-0">
+   483→            <p className="truncate font-display text-sm font-bold leading-tight">LeadMind Copilot</p>
+   484→            {conversationTitle ? (
+   485→              <p className="truncate text-xs text-muted-foreground" title={conversationTitle}>
+   486→                {conversationTitle}
+   487→              </p>
+   488→            ) : contextLead ? (
+   489→              <p className="truncate text-xs text-muted-foreground">
+   490→                Context:{" "}
+   491→                <button type="button" className="font-medium text-[var(--lm-brand)] hover:underline" onClick={onOpenContextLead}>
+   492→                  {contextLead.label}
+   493→                </button>
+   494→                <button type="button" className="ml-2 text-muted-foreground hover:underline" onClick={onClearContext}>
+   495→                  clear
+   496→                </button>
+   497→              </p>
+   498→            ) : (
+   499→              <p className="truncate text-xs text-muted-foreground">
+   500→                {isDemo ? "Local demo assistant — deterministic, live workspace data" : "Connected to external LLM"}
+   501→              </p>
+   502→            )}
+   503→          </div>
+   504→        </div>
+   505→        <div className="flex shrink-0 items-center gap-1.5">
+   506→          {contextLead && conversationTitle && (
+   507→            <button
+   508→              type="button"
+   509→              onClick={onOpenContextLead}
+   510→              className="hidden max-w-[16rem] items-center truncate rounded-full border border-[var(--lm-brand)]/30 bg-[var(--lm-brand-soft)] px-2.5 py-0.5 text-[10.5px] font-medium text-[var(--lm-brand)] hover:border-[var(--lm-brand)]/60 xl:inline-flex"
+   511→              title={`Open lead: ${contextLead.label}`}
+   512→            >
+   513→              <User className="mr-1 size-3" aria-hidden="true" />
+   514→              {contextLead.label}
+   515→            </button>
+   516→          )}
+   517→          <span
+   518→            className={cn(
+   519→              "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium",
+   520→              isDemo
+   521→                ? "border-amber-500/40 text-amber-600 dark:text-amber-400"
+   522→                : "border-[var(--lm-brand)]/40 text-[var(--lm-brand)]",
+   523→            )}
+   524→          >
+   525→            <span className={cn("h-1.5 w-1.5 rounded-full", isDemo ? "bg-amber-500" : "bg-[var(--lm-brand)] lm-pulse-dot")} aria-hidden="true" />
+   526→            {isDemo ? "DEMO" : "LIVE LLM"}
+   527→          </span>
+   528→          {canRetry && (
+   529→            <Button
+   530→              variant="ghost"
+   531→              size="icon"
+   532→              className="h-8 w-8"
+   533→              onClick={onRetry}
+   534→              disabled={sending}
+   535→              aria-label="Regenerate last answer"
+   536→              title="Regenerate last answer"
+   537→            >
+   538→              <RefreshCcw className="h-4 w-4" />
+   539→            </Button>
+   540→          )}
+   541→          {headerActions}
+   542→        </div>
+   543→      </div>
+   544→
+   545→      {/* ── Message stream ────────────────────────────────────────────────── */}
+   546→      <div className="relative min-h-0 flex-1">
+   547→        <div ref={scrollRef} onScroll={handleScroll} className="lm-scroll absolute inset-0 overflow-y-auto">
+   548→          <div className="relative z-10 mx-auto w-full max-w-[54rem] space-y-5 px-4 py-5 sm:px-6 sm:py-6">
+   549→            {loadingThread ? (
+   550→              <div className="space-y-4" aria-label="Loading conversation">
+   551→                {[0, 1, 2].map((i) => (
+   552→                  <motion.div
+   553→                    key={i}
+   554→                    className={cn("h-16 rounded-2xl border border-border/60 bg-muted/40", i % 2 === 1 && "ml-auto w-3/4")}
+   555→                    style={{ width: i % 2 === 1 ? undefined : `${55 + i * 8}%` }}
+   556→                    initial={reduced ? false : { opacity: 0 }}
+   557→                    animate={{ opacity: [0.4, 0.85, 0.4] }}
+   558→                    transition={{ duration: 1.6, repeat: Infinity, delay: i * 0.2 }}
+   559→                  />
+   560→                ))}
+   561→              </div>
+   562→            ) : messages.length === 0 ? (
+   563→              <motion.div
+   564→                className="flex flex-col items-center px-2 py-10 text-center sm:py-14"
+   565→                initial={reduced ? false : { opacity: 0, y: 14 }}
+   566→                animate={{ opacity: 1, y: 0 }}
+   567→                transition={{ duration: 0.4 }}
+   568→              >
+   569→                <div className="relative mb-5">
+   570→                  <div
+   571→                    aria-hidden="true"
+   572→                    className="absolute inset-0 -z-10 rounded-full blur-2xl"
+   573→                    style={{ background: "radial-gradient(closest-side, var(--lm-brand-soft), transparent)" }}
+   574→                  />
+   575→                  <LogoMark size={60} />
+   576→                </div>
+   577→                <p className="font-display text-lg font-bold tracking-tight sm:text-xl">Ask your pipeline anything</p>
+   578→                <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
+   579→                  The Copilot investigates real workspace data through validated tools — lead search,
+   580→                  scoring explanations, analytics, recommendations and knowledge retrieval. It never
+   581→                  invents records.
+   582→                </p>
+   583→                {suggestions.length > 0 && (
+   584→                  <div className="mt-6 flex max-w-2xl flex-wrap justify-center gap-2">
+   585→                    {suggestions.map((s, i) => (
+   586→                      <motion.button
+   587→                        key={i}
+   588→                        type="button"
+   589→                        onClick={() => onSend(expandSlashCommand(s))}
+   590→                        disabled={sending}
+   591→                        className="rounded-full border bg-background/60 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur transition-colors hover:border-[var(--lm-brand)]/40 hover:text-[var(--lm-brand)] disabled:opacity-50"
+   592→                        initial={reduced ? false : { opacity: 0, y: 6 }}
+   593→                        animate={{ opacity: 1, y: 0 }}
+   594→                        transition={{ delay: 0.15 + i * 0.05, duration: 0.3 }}
+   595→                      >
+   596→                        {s}
+   597→                      </motion.button>
+   598→                    ))}
+   599→                  </div>
+   600→                )}
+   601→                <div className="mt-5 flex flex-wrap items-center justify-center gap-1.5" aria-label="Slash command shortcuts">
+   602→                  {COPILOT_COMMANDS.filter((c) => !c.send).map((c) => (
+   603→                    <button
+   604→                      key={c.command}
+   605→                      type="button"
+   606→                      disabled={sending}
+   607→                      onClick={() => selectCommand(c)}
+   608→                      title={`${c.label} — ${c.hint}`}
+   609→                      className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-muted/30 px-2 py-1 font-mono text-[10.5px] text-muted-foreground transition-colors hover:border-[var(--lm-brand)]/40 hover:text-[var(--lm-brand)] disabled:opacity-50"
+   610→                    >
+   611→                      <c.icon className="size-3" aria-hidden="true" />
+   612→                      {c.command}
+   613→                    </button>
+   614→                  ))}
+   615→                </div>
+   616→              </motion.div>
+   617→            ) : (
+   618→              <AnimatePresence initial={false} mode="popLayout">
+   619→                {messages.map((m) => (
+   620→                  <motion.div
+   621→                    key={m.id}
+   622→                    layout={!reduced}
+   623→                    variants={MESSAGE_VARIANTS}
+   624→                    initial={reduced ? false : "hidden"}
+   625→                    animate="show"
+   626→                    exit="exit"
+   627→                    className={cn("flex gap-3", m.role === "USER" ? "justify-end" : "justify-start")}
+   628→                  >
+   629→                    {m.role === "ASSISTANT" && (
+   630→                      <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-[var(--lm-brand-soft)] ring-1 ring-[var(--lm-brand)]/25">
+   631→                        <LogoMark size={18} badge={false} />
+   632→                      </div>
+   633→                    )}
+   634→                    <div
+   635→                      className={cn(
+   636→                        "min-w-0 space-y-2",
+   637→                        m.role === "USER" ? "flex max-w-[85%] flex-col items-end sm:max-w-[75%]" : "w-full min-w-0 max-w-[calc(100%-2.25rem)] sm:max-w-[calc(100%-2.5rem)]",
+   638→                      )}
+   639→                    >
+   640→                      {m.toolTraces.length > 0 && <ToolTracePanel traces={m.toolTraces} />}
+   641→                      <div
+   642→                        className={cn(
+   643→                          "text-sm",
+   644→                          m.role === "USER"
+   645→                            ? "rounded-2xl rounded-br-md bg-[linear-gradient(135deg,var(--lm-brand),color-mix(in_oklab,var(--lm-brand),var(--lm-info)_35%))] px-4 py-3 text-white shadow-[0_6px_18px_-8px_var(--lm-brand)]"
+   646→                            : "rounded-2xl rounded-bl-md border border-border/70 bg-card/85 px-4 py-3.5 backdrop-blur-md sm:px-5",
+   647→                          m.streaming && m.content.length === 0 && "animate-pulse",
+   648→                        )}
+   649→                      >
+   650→                        {m.role === "USER" ? (
+   651→                          <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
+   652→                        ) : (
+   653→                          <div className={cn(m.streaming && "lm-caret")}>
+   654→                            {m.content ? (
+   655→                              <Markdown content={m.content} />
+   656→                            ) : (
+   657→                              <TypingDots className="py-1" />
+   658→                            )}
+   659→                          </div>
+   660→                        )}
+   661→                      </div>
+   662→                      <div className="flex items-center gap-2 px-1 text-[10px] text-muted-foreground">
+   663→                        <span>{new Date(m.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+   664→                        {m.role === "ASSISTANT" && !m.streaming && m.content.length > 0 && (
+   665→                          <button
+   666→                            type="button"
+   667→                            className="inline-flex items-center gap-1 rounded px-1 transition-colors hover:text-foreground"
+   668→                            aria-label="Copy response"
+   669→                            onClick={() => {
+   670→                              navigator.clipboard.writeText(m.content).then(
+   671→                                () => toast.success("Copied to clipboard"),
+   672→                                () => toast.error("Copy failed"),
+   673→                              );
+   674→                            }}
+   675→                          >
+   676→                            <Copy className="h-3 w-3" aria-hidden="true" /> copy
+   677→                          </button>
+   678→                        )}
+   679→                        {lastAssistantErrored && m === lastMsg && (
+   680→                          <button
+   681→                            type="button"
+   682→                            className="ml-auto inline-flex items-center gap-1 rounded px-1 font-medium text-[var(--lm-brand)] transition-colors hover:underline"
+   683→                            onClick={onRetry}
+   684→                            disabled={sending}
+   685→                          >
+   686→                            <RefreshCcw className="h-3 w-3" aria-hidden="true" /> Try again
+   687→                          </button>
+   688→                        )}
+   689→                      </div>
+   690→                    </div>
+   691→                    {m.role === "USER" && (
+   692→                      <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-muted">
+   693→                        <User className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+   694→                      </div>
+   695→                    )}
+   696→                  </motion.div>
+   697→                ))}
+   698→              </AnimatePresence>
+   699→            )}
+   700→
+   701→            {/* Confirmation gate (existing pending-action protocol) */}
+   702→            <AnimatePresence>
+   703→              {pending && (
+   704→                <motion.div
+   705→                  key="pending"
+   706→                  initial={reduced ? false : { opacity: 0, y: 10, scale: 0.98 }}
+   707→                  animate={{ opacity: 1, y: 0, scale: 1 }}
+   708→                  exit={{ opacity: 0, scale: 0.98 }}
+   709→                  transition={{ duration: 0.22 }}
+   710→                  className="mx-auto w-full max-w-lg overflow-hidden rounded-xl border border-amber-500/40 bg-amber-50/80 backdrop-blur-md dark:bg-amber-950/30"
+   711→                  role="alertdialog"
+   712→                  aria-label="Confirmation required"
+   713→                >
+   714→                  <div className="space-y-3 p-4">
+   715→                    <div className="flex items-center gap-2 text-sm font-medium">
+   716→                      <span className="flex h-6 w-6 items-center justify-center rounded-md bg-amber-500/15">
+   717→                        <ShieldQuestion className="h-4 w-4 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+   718→                      </span>
+   719→                      Confirmation required
+   720→                    </div>
+   721→                    <p className="text-sm leading-relaxed text-muted-foreground">{pending.summary}</p>
+   722→                    <div className="flex flex-wrap gap-2">
+   723→                      <Button
+   724→                        size="sm"
+   725→                        onClick={() => onResolvePending("confirm")}
+   726→                        className="bg-amber-600 text-white hover:bg-amber-500"
+   727→                      >
+   728→                        <Check className="mr-1 h-3.5 w-3.5" aria-hidden="true" /> Confirm &amp; execute
+   729→                      </Button>
+   730→                      <Button size="sm" variant="ghost" onClick={() => onResolvePending("cancel")}>
+   731→                        <X className="mr-1 h-3.5 w-3.5" aria-hidden="true" /> Cancel
+   732→                      </Button>
+   733→                    </div>
+   734→                  </div>
+   735→                </motion.div>
+   736→              )}
+   737→            </AnimatePresence>
+   738→
+   739→            {/* Assistant status line with animated indicator */}
+   740→            <AnimatePresence>
+   741→              {statusLine && (
+   742→                <motion.div
+   743→                  key="status"
+   744→                  initial={reduced ? false : { opacity: 0, y: 6 }}
+   745→                  animate={{ opacity: 1, y: 0 }}
+   746→                  exit={{ opacity: 0 }}
+   747→                  className="flex items-center gap-2.5 pl-10 text-xs text-muted-foreground"
+   748→                  aria-live="polite"
+   749→                >
+   750→                  {statusLine.toLowerCase().includes("tool") ? (
+   751→                    <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--lm-brand)]" aria-hidden="true" />
+   752→                  ) : (
+   753→                    <TypingDots />
+   754→                  )}
+   755→                  <span>{statusLine}</span>
+   756→                </motion.div>
+   757→              )}
+   758→            </AnimatePresence>
+   759→
+   760→            <div ref={bottomRef} aria-hidden="true" />
+   761→          </div>
+   762→        </div>
+   763→
+   764→        {/* Scroll-to-latest */}
+   765→        <AnimatePresence>
+   766→          {!nearBottom && messages.length > 0 && (
+   767→            <motion.div
+   768→              initial={reduced ? false : { opacity: 0, y: 8 }}
+   769→              animate={{ opacity: 1, y: 0 }}
+   770→              exit={{ opacity: 0, y: 8 }}
+   771→              className="absolute bottom-3 left-1/2 z-20 -translate-x-1/2"
+   772→            >
+   773→              <Button
+   774→                size="sm"
+   775→                variant="outline"
+   776→                className="h-8 rounded-full bg-background/90 shadow-lg backdrop-blur"
+   777→                onClick={scrollToLatest}
+   778→                aria-label="Scroll to latest messages"
+   779→              >
+   780→                <ArrowDown className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+   781→                Latest
+   782→              </Button>
+   783→            </motion.div>
+   784→          )}
+   785→        </AnimatePresence>
+   786→      </div>
+   787→
+   788→      {/* ── Composer ──────────────────────────────────────────────────────── */}
+   789→      <div className="relative z-10 border-t border-border/70 p-3 sm:px-5">
+   790→        <div className="relative mx-auto w-full max-w-[54rem]">
+   791→          <CommandPalette
+   792→            visible={paletteOpen}
+   793→            activeIndex={activeCmdIndex}
+   794→            items={filteredCommands}
+   795→            onSelect={selectCommand}
+   796→          />
+   797→
+   798→          <div className="flex items-end gap-2 rounded-xl border border-border/70 bg-card/70 p-2 shadow-sm backdrop-blur-md transition-[border-color,box-shadow] focus-within:border-[var(--lm-brand)]/40 focus-within:shadow-[0_0_0_3px_var(--lm-brand-soft)]">
+   799→            <Textarea
+   800→              ref={textareaRef}
+   801→              value={input}
+   802→              onChange={(e) => setInput(e.target.value)}
+   803→              onKeyDown={handleKeyDown}
+   804→              placeholder="Ask about leads, scores, predictions, actions…  Type / for commands"
+   805→              rows={1}
+   806→              maxLength={MAX_MESSAGE_LENGTH}
+   807→              aria-label="Message the copilot"
+   808→              className="max-h-[180px] min-h-[2.25rem] flex-1 resize-none border-0 bg-transparent px-2 py-1.5 text-sm shadow-none focus-visible:ring-0"
+   809→              disabled={sending}
+   810→            />
+   811→            <div className="flex shrink-0 flex-col items-end gap-1">
+   812→              {nearLimit && (
+   813→                <span
+   814→                  className={cn(
+   815→                    "font-mono text-[9.5px] tabular-nums",
+   816→                    input.length >= MAX_MESSAGE_LENGTH ? "text-rose-500" : "text-muted-foreground",
+   817→                  )}
+   818→                  aria-live="polite"
+   819→                >
+   820→                  {input.length}/{MAX_MESSAGE_LENGTH}
+   821→                </span>
+   822→              )}
+   823→              {sending ? (
+   824→                <Button
+   825→                  variant="destructive"
+   826→                  size="icon"
+   827→                  className="h-9 w-9"
+   828→                  onClick={onStop}
+   829→                  aria-label="Stop generating"
+   830→                  title="Stop generating"
+   831→                >
+   832→                  <X className="h-4 w-4" aria-hidden="true" />
+   833→                </Button>
+   834→              ) : (
+   835→                <LiquidGlassButton
+   836→                  variant="brand"
+   837→                  size="icon"
+   838→                  className="h-9 w-9"
+   839→                  onClick={submitInput}
+   840→                  disabled={!input.trim()}
+   841→                  aria-label="Send message"
+   842→                  title="Send message (Enter)"
+   843→                >
+   844→                  <Send className="h-4 w-4" aria-hidden="true" />
+   845→                </LiquidGlassButton>
+   846→              )}
+   847→            </div>
+   848→          </div>
+   849→        </div>
+   850→
+   851→        <p className="mx-auto mt-1.5 hidden max-w-[54rem] items-center gap-3 px-1 text-[10px] text-muted-foreground sm:flex">
+   852→          <span className="inline-flex items-center gap-1">
+   853→            <kbd className="rounded border bg-muted px-1 font-mono text-[9px]">/</kbd> commands
+   854→          </span>
+   855→          <span className="inline-flex items-center gap-1">
+   856→            <kbd className="rounded border bg-muted px-1 font-mono text-[9px]">Enter</kbd> send
+   857→          </span>
+   858→          <span className="inline-flex items-center gap-1">
+   859→            <kbd className="rounded border bg-muted px-1 font-mono text-[9px]">Shift+Enter</kbd> newline
+   860→          </span>
+   861→          <span className="ml-auto inline-flex items-center gap-1">
+   862→            <Terminal className="h-3 w-3" aria-hidden="true" />
+   863→            Answers are grounded in validated tool output
+   864→          </span>
+   865→        </p>
+   866→      </div>
+   867→    </div>
+   868→  );
+   869→}
+   870→

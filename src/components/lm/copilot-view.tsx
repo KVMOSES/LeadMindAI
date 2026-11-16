@@ -13,6 +13,7 @@ import {
   PanelLeft,
   Search,
   Trash2,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -370,8 +371,18 @@ export function CopilotView({ session }: { session: SessionData }) {
             onChange={(e) => setRailQuery(e.target.value)}
             placeholder="Search conversations"
             aria-label="Search conversations"
-            className="h-8 border-[var(--sidebar-border)] bg-white/5 pl-8 text-xs text-[var(--sidebar-foreground)] placeholder:text-[var(--sidebar-foreground)]/40"
+            className="h-8 rounded-lg border-[var(--sidebar-border)] bg-white/5 pl-8 pr-7 text-xs text-[var(--sidebar-foreground)] placeholder:text-[var(--sidebar-foreground)]/40"
           />
+          {railQuery && (
+            <button
+              type="button"
+              onClick={() => setRailQuery("")}
+              aria-label="Clear search"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-[var(--sidebar-foreground)]/55 transition-colors hover:text-[var(--sidebar-foreground)]"
+            >
+              <X className="size-3" aria-hidden="true" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -397,7 +408,7 @@ export function CopilotView({ session }: { session: SessionData }) {
               <p className="px-2 pb-1 pt-2 font-mono text-[9.5px] font-semibold uppercase tracking-[0.16em] text-[var(--sidebar-foreground)]/45">
                 {group.label}
               </p>
-              <ul className="space-y-0.5">
+              <ul className="space-y-1">
                 {group.items.map((c) => {
                   const active = c.id === conversationId;
                   return (
@@ -407,19 +418,19 @@ export function CopilotView({ session }: { session: SessionData }) {
                         onClick={() => selectConversation(c.id)}
                         aria-current={active ? "true" : undefined}
                         className={cn(
-                          "flex w-full flex-col gap-0.5 rounded-lg px-2.5 py-2 pr-8 text-left transition-colors",
+                          "flex w-full flex-col gap-1 rounded-xl px-3 py-2.5 pr-9 text-left transition-all",
                           active
-                            ? "bg-[var(--lm-brand-soft)] text-[var(--sidebar-foreground)]"
+                            ? "bg-[var(--lm-brand-soft)] ring-1 ring-[var(--lm-brand)]/25"
                             : "text-[var(--sidebar-foreground)] hover:bg-[var(--lm-sidebar-hover)]",
                         )}
                       >
+                        {active && (
+                          <span
+                            aria-hidden="true"
+                            className="absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-full bg-gradient-to-b from-[var(--lm-brand)] to-[var(--lm-info)]"
+                          />
+                        )}
                         <span className="flex items-center gap-1.5">
-                          {active && (
-                            <span
-                              aria-hidden="true"
-                              className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-[var(--lm-brand)]"
-                            />
-                          )}
                           {sending && active && (
                             <span aria-hidden="true" className="lm-pulse-dot size-1.5 shrink-0 rounded-full bg-[var(--lm-lime)]" />
                           )}
@@ -446,7 +457,7 @@ export function CopilotView({ session }: { session: SessionData }) {
                       </button>
                       <button
                         type="button"
-                        className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1.5 text-[var(--sidebar-foreground)]/55 opacity-0 transition-opacity hover:bg-rose-500/15 hover:text-rose-400 focus-visible:opacity-100 group-hover/item:opacity-100"
+                        className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-md bg-[var(--lm-sidebar)]/80 p-1.5 text-[var(--sidebar-foreground)]/55 opacity-0 transition-opacity hover:bg-rose-500/15 hover:text-rose-400 focus-visible:opacity-100 group-hover/item:opacity-100"
                         aria-label={`Delete conversation ${c.title}`}
                         onClick={(e) => {
                           e.stopPropagation();
