@@ -131,7 +131,7 @@ function BrandMark({ compact = false }: { compact?: boolean }) {
 
 // ── Main shell ───────────────────────────────────────────────────────────────
 
-export function AppShell({ session }: { session: SessionData }) {
+export function AppShell({ session, onLogout }: { session: SessionData; onLogout?: () => void }) {
   const view = useAppStore((s) => s.view);
   const navigate = useAppStore((s) => s.navigate);
   const syncFromHash = useAppStore((s) => s.syncFromHash);
@@ -183,6 +183,8 @@ export function AppShell({ session }: { session: SessionData }) {
       // ignore network failures on logout
     }
     setSession(null);
+    // Notify the host (page.tsx owns the session state) so the login screen renders.
+    onLogout?.();
     toast.success("Signed out");
   };
 

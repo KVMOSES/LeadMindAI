@@ -61,5 +61,5 @@ export default function Home() {
     );
   }
 
-  return <AppShell session={session} />;
+  return <AppShell session={session} onLogout={() => { setSession(null); setStatus("anon"); }} />;
 }

@@ -1,0 +1,624 @@
+     1→     1→"use client";
+     2→     2→
+     3→     3→import { useCallback, useEffect, useRef, useState } from "react";
+     4→     4→import type { SessionData } from "@/lib/store";
+     5→     5→import { useAppStore } from "@/lib/store";
+     6→     6→import { api, fmtDateTime, fmtRelative } from "@/lib/api";
+     7→     7→import { Card, CardContent } from "@/components/ui/card";
+     8→     8→import { Button } from "@/components/ui/button";
+     9→     9→import { Badge } from "@/components/ui/badge";
+    10→    10→import { Textarea } from "@/components/ui/textarea";
+    11→    11→import { ScrollArea } from "@/components/ui/scroll-area";
+    12→    12→import { Separator } from "@/components/ui/separator";
+    13→    13→import { Skeleton } from "@/components/ui/skeleton";
+    14→    14→import {
+    15→    15→  BrainCircuit,
+    16→    16→  Check,
+    17→    17→  ChevronDown,
+    18→    18→  Copy,
+    19→    19→  Loader2,
+    20→    20→  MessageSquarePlus,
+    21→    21→  RefreshCcw,
+    22→    22→  Send,
+    23→    23→  Trash2,
+    24→    24→  User,
+    25→    25→  Wrench,
+    26→    26→  X,
+    27→    27→  Zap,
+    28→    28→} from "lucide-react";
+    29→    29→import { toast } from "sonner";
+    30→    30→import { cn } from "@/lib/utils";
+    31→    31→import { Markdown, EmptyState } from "@/components/lm/shared";
+    32→    32→import { LiquidGlassButton } from "@/components/ui/liquid-glass-button";
+    33→    33→
+    34→    34→interface ToolTrace {
+    35→    35→  name: string;
+    36→    36→  args: Record<string, unknown>;
+    37→    37→  ok: boolean;
+    38→    38→  summary: string;
+    39→    39→  ms: number;
+    40→    40→}
+    41→    41→
+    42→    42→interface ChatMsg {
+    43→    43→  id: string;
+    44→    44→  role: "USER" | "ASSISTANT";
+    45→    45→  content: string;
+    46→    46→  toolTraces: ToolTrace[];
+    47→    47→  createdAt: string;
+    48→    48→  streaming?: boolean;
+    49→    49→}
+    50→    50→
+    51→    51→interface ConversationSummary {
+    52→    52→  id: string;
+    53→    53→  title: string;
+    54→    54→  mode: string;
+    55→    55→  updatedAt: string;
+    56→    56→  firstMessage: string;
+    57→    57→}
+    58→    58→
+    59→    59→interface PendingCard {
+    60→    60→  pendingActionId: string;
+    61→    61→  summary: string;
+    62→    62→}
+    63→    63→
+    64→    64→export function CopilotView({ session }: { session: SessionData }) {
+    65→    65→  const conversationId = useAppStore((s) => s.conversationId);
+    66→    66→  const leadContextId = useAppStore((s) => s.leadContextId);
+    67→    67→  const navigate = useAppStore((s) => s.navigate);
+    68→    68→
+    69→    69→  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+    70→    70→  const [messages, setMessages] = useState<ChatMsg[]>([]);
+    71→    71→  const [loadingThread, setLoadingThread] = useState(false);
+    72→    72→  const [sending, setSending] = useState(false);
+    73→    73→  const [input, setInput] = useState("");
+    74→    74→  const [statusLine, setStatusLine] = useState<string | null>(null);
+    75→    75→  const [pending, setPending] = useState<PendingCard | null>(null);
+    76→    76→  const [suggestions, setSuggestions] = useState<string[]>([]);
+    77→    77→  const [contextLead, setContextLead] = useState<{ id: string; label: string } | null>(null);
+    78→    78→  const [mobileListOpen, setMobileListOpen] = useState(false);
+    79→    79→  const bottomRef = useRef<HTMLDivElement>(null);
+    80→    80→  const abortRef = useRef<AbortController | null>(null);
+    81→    81→  // When send() creates a fresh conversation we optimistically append messages;
+    82→    82→  // the conversationId effect must not clobber them with an empty server thread.
+    83→    83→  const skipThreadLoadRef = useRef(false);
+    84→    84→
+    85→    85→  const loadConversations = useCallback(async () => {
+    86→    86→    try {
+    87→    87→      const res = await api<{ conversations: ConversationSummary[] }>("/api/chat/conversations");
+    88→    88→      setConversations(res.conversations);
+    89→    89→    } catch {
+    90→    90→      // sidebar is non-critical
+    91→    91→    }
+    92→    92→  }, []);
+    93→    93→
+    94→    94→  useEffect(() => {
+    95→    95→    loadConversations();
+    96→    96→  }, [loadConversations]);
+    97→    97→
+    98→    98→  useEffect(() => {
+    99→    99→    api<{ suggestions: string[] }>(`/api/chat/suggestions?page=copilot${leadContextId ? `&leadId=${leadContextId}` : ""}`)
+   100→   100→      .then((r) => setSuggestions(r.suggestions))
+   101→   101→      .catch(() => setSuggestions([]));
+   102→   102→  }, [leadContextId]);
+   103→   103→
+   104→   104→  useEffect(() => {
+   105→   105→    if (!leadContextId) {
+   106→   106→      setContextLead(null);
+   107→   107→      return;
+   108→   108→    }
+   109→   109→    api<{ detail: { lead: { contactName: string; company: { name: string } | null } } }>(`/api/leads/${leadContextId}`)
+   110→   110→      .then((r) => setContextLead({ id: leadContextId, label: `${r.detail.lead.contactName} — ${r.detail.lead.company?.name ?? "unknown"}` }))
+   111→   111→      .catch(() => setContextLead(null));
+   112→   112→  }, [leadContextId]);
+   113→   113→
+   114→   114→  const loadThread = useCallback(async (id: string) => {
+   115→   115→    setLoadingThread(true);
+   116→   116→    setPending(null);
+   117→   117→    try {
+   118→   118→      const res = await api<{
+   119→   119→        conversation: { id: string; title: string; mode: string; messages: { id: string; role: "USER" | "ASSISTANT"; content: string; toolTraces: ToolTrace[]; createdAt: string }[] };
+   120→   120→      }>(`/api/chat/conversations/${id}`);
+   121→   121→      setMessages(res.conversation.messages);
+   122→   122→    } catch (e) {
+   123→   123→      toast.error(e instanceof Error ? e.message : "Failed to load conversation");
+   124→   124→    } finally {
+   125→   125→      setLoadingThread(false);
+   126→   126→    }
+   127→   127→  }, []);
+   128→   128→
+   129→   129→  useEffect(() => {
+   130→   130→    if (conversationId) {
+   131→   131→      if (skipThreadLoadRef.current) {
+   132→   132→        skipThreadLoadRef.current = false;
+   133→   133→        return;
+   134→   134→      }
+   135→   135→      loadThread(conversationId);
+   136→   136→    } else {
+   137→   137→      setMessages([]);
+   138→   138→    }
+   139→   139→  }, [conversationId, loadThread]);
+   140→   140→
+   141→   141→  useEffect(() => {
+   142→   142→    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+   143→   143→  }, [messages, statusLine]);
+   144→   144→
+   145→   145→  const newConversation = async () => {
+   146→   146→    try {
+   147→   147→      const res = await api<{ conversation: { id: string } }>("/api/chat/conversations", { method: "POST", body: {} });
+   148→   148→      await loadConversations();
+   149→   149→      navigate("copilot", { conversationId: res.conversation.id });
+   150→   150→    } catch (e) {
+   151→   151→      toast.error(e instanceof Error ? e.message : "Could not create conversation");
+   152→   152→    }
+   153→   153→  };
+   154→   154→
+   155→   155→  const deleteConversation = async (id: string) => {
+   156→   156→    try {
+   157→   157→      await api(`/api/chat/conversations/${id}`, { method: "DELETE" });
+   158→   158→      if (conversationId === id) {
+   159→   159→        navigate("copilot");
+   160→   160→        setMessages([]);
+   161→   161→      }
+   162→   162→      await loadConversations();
+   163→   163→      toast.success("Conversation deleted");
+   164→   164→    } catch (e) {
+   165→   165→      toast.error(e instanceof Error ? e.message : "Delete failed");
+   166→   166→    }
+   167→   167→  };
+   168→   168→
+   169→   169→  // ── Streaming send ─────────────────────────────────────────────────────────
+   170→   170→
+   171→   171→  const send = async (content: string) => {
+   172→   172→    if (!content.trim() || sending) return;
+   173→   173→    let convId = conversationId;
+   174→   174→    if (!convId) {
+   175→   175→      try {
+   176→   176→        const res = await api<{ conversation: { id: string } }>("/api/chat/conversations", { method: "POST", body: {} });
+   177→   177→        convId = res.conversation.id;
+   178→   178→        skipThreadLoadRef.current = true;
+   179→   179→        navigate("copilot", { conversationId: convId });
+   180→   180→        await loadConversations();
+   181→   181→      } catch (e) {
+   182→   182→        toast.error(e instanceof Error ? e.message : "Could not create conversation");
+   183→   183→        return;
+   184→   184→      }
+   185→   185→    }
+   186→   186→    setSending(true);
+   187→   187→    setPending(null);
+   188→   188→    setMessages((m) => [
+   189→   189→      ...m,
+   190→   190→      { id: `local-${Date.now()}`, role: "USER", content, toolTraces: [], createdAt: new Date().toISOString() },
+   191→   191→      { id: "streaming", role: "ASSISTANT", content: "", toolTraces: [], createdAt: new Date().toISOString(), streaming: true },
+   192→   192→    ]);
+   193→   193→    setInput("");
+   194→   194→    setStatusLine("Thinking…");
+   195→   195→
+   196→   196→    const controller = new AbortController();
+   197→   197→    abortRef.current = controller;
+   198→   198→
+   199→   199→    try {
+   200→   200→      const res = await fetch(`/api/chat/conversations/${convId}/messages`, {
+   201→   201→        method: "POST",
+   202→   202→        headers: { "Content-Type": "application/json" },
+   203→   203→        body: JSON.stringify({ content, leadContextId: leadContextId ?? undefined }),
+   204→   204→        signal: controller.signal,
+   205→   205→      });
+   206→   206→      if (!res.ok || !res.body) {
+   207→   207→        const err = (await res.json().catch(() => ({}))) as { error?: string };
+   208→   208→        throw new Error(err.error ?? `Chat failed (${res.status})`);
+   209→   209→      }
+   210→   210→      const reader = res.body.getReader();
+   211→   211→      const decoder = new TextDecoder();
+   212→   212→      let buf = "";
+   213→   213→      let answerDone = false;
+   214→   214→
+   215→   215→      const handleEvent = (ev: Record<string, unknown>) => {
+   216→   216→        const type = ev.type as string;
+   217→   217→        if (type === "status") {
+   218→   218→          const stage = ev.stage as string;
+   219→   219→          if (stage === "executing_tool") setStatusLine(`Running tool: ${ev.tool}`);
+   220→   220→          else if (stage === "answering") setStatusLine(null);
+   221→   221→          else if (stage === "finalizing") setStatusLine("Finalizing answer…");
+   222→   222→          else if (stage === "demo_reasoning") setStatusLine("Demo assistant analysing workspace data…");
+   223→   223→          else if (stage?.includes("falling_back")) setStatusLine("External LLM unavailable — using local demo assistant…");
+   224→   224→          else setStatusLine("Thinking…");
+   225→   225→        } else if (type === "tools") {
+   226→   226→          const traces = ev.traces as ToolTrace[];
+   227→   227→          setStatusLine(null);
+   228→   228→          setMessages((m) =>
+   229→   229→            m.map((msg) => (msg.id === "streaming" ? { ...msg, toolTraces: [...msg.toolTraces, ...traces] } : msg)),
+   230→   230→          );
+   231→   231→        } else if (type === "delta") {
+   232→   232→          setStatusLine(null);
+   233→   233→          const text = ev.text as string;
+   234→   234→          setMessages((m) => m.map((msg) => (msg.id === "streaming" ? { ...msg, content: msg.content + text } : msg)));
+   235→   235→        } else if (type === "pending_action") {
+   236→   236→          setPending({ pendingActionId: ev.pendingActionId as string, summary: ev.summary as string });
+   237→   237→        } else if (type === "done") {
+   238→   238→          answerDone = true;
+   239→   239→          setStatusLine(null);
+   240→   240→          const finalId = (ev.messageId as string) ?? `done-${Date.now()}`;
+   241→   241→          const traces = (ev.traces as ToolTrace[]) ?? [];
+   242→   242→          setMessages((m) =>
+   243→   243→            m.map((msg) => (msg.id === "streaming" ? { ...msg, id: finalId, toolTraces: traces, streaming: false } : msg)),
+   244→   244→          );
+   245→   245→          if (ev.title) loadConversations();
+   246→   246→        } else if (type === "error") {
+   247→   247→          answerDone = true;
+   248→   248→          setStatusLine(null);
+   249→   249→          setMessages((m) =>
+   250→   250→            m.map((msg) =>
+   251→   251→              msg.id === "streaming"
+   252→   252→                ? { ...msg, id: `err-${Date.now()}`, streaming: false, content: msg.content || `**Error:** ${ev.message}` }
+   253→   253→                : msg,
+   254→   254→            ),
+   255→   255→          );
+   256→   256→          toast.error((ev.message as string) ?? "Chat error");
+   257→   257→        }
+   258→   258→      };
+   259→   259→
+   260→   260→      while (true) {
+   261→   261→        const { done, value } = await reader.read();
+   262→   262→        if (done) break;
+   263→   263→        buf += decoder.decode(value, { stream: true });
+   264→   264→        let idx: number;
+   265→   265→        while ((idx = buf.indexOf("\n\n")) >= 0) {
+   266→   266→          const raw = buf.slice(0, idx).trim();
+   267→   267→          buf = buf.slice(idx + 2);
+   268→   268→          if (raw.startsWith("data:")) {
+   269→   269→            try {
+   270→   270→              handleEvent(JSON.parse(raw.slice(5).trim()));
+   271→   271→            } catch {
+   272→   272→              // malformed event
+   273→   273→            }
+   274→   274→          }
+   275→   275→        }
+   276→   276→      }
+   277→   277→      if (!answerDone) {
+   278→   278→        setMessages((m) => m.map((msg) => (msg.id === "streaming" ? { ...msg, streaming: false } : msg)));
+   279→   279→      }
+   280→   280→    } catch (e) {
+   281→   281→      if ((e as Error).name === "AbortError") {
+   282→   282→        setMessages((m) => m.map((msg) => (msg.id === "streaming" ? { ...msg, streaming: false, content: msg.content || "_Stopped._" } : msg)));
+   283→   283→      } else {
+   284→   284→        const msg = e instanceof Error ? e.message : "Chat failed";
+   285→   285→        setMessages((m) => m.map((m2) => (m2.id === "streaming" ? { ...m2, streaming: false, content: `**Error:** ${msg}` } : m2)));
+   286→   286→        toast.error(msg);
+   287→   287→      }
+   288→   288→    } finally {
+   289→   289→      setSending(false);
+   290→   290→      setStatusLine(null);
+   291→   291→      abortRef.current = null;
+   292→   292→    }
+   293→   293→  };
+   294→   294→
+   295→   295→  const stop = () => abortRef.current?.abort();
+   296→   296→
+   297→   297→  const resolvePending = async (action: "confirm" | "cancel") => {
+   298→   298→    if (!pending) return;
+   299→   299→    try {
+   300→   300→      const res = await api<{ result?: { ok: boolean; summary: string }; cancelled?: boolean }>(`/api/chat/pending/${pending.pendingActionId}`, {
+   301→   301→        method: "POST",
+   302→   302→        body: { action },
+   303→   303→      });
+   304→   304→      if (action === "confirm") {
+   305→   305→        if (res.result?.ok) toast.success(res.result.summary);
+   306→   306→        else toast.error(res.result?.summary ?? "Action failed");
+   307→   307→        setMessages((m) => [
+   308→   308→          ...m,
+   309→   309→          {
+   310→   310→            id: `sys-${Date.now()}`,
+   311→   311→            role: "ASSISTANT",
+   312→   312→            content: res.result?.ok
+   313→   313→              ? `**Action executed.** ${res.result.summary}`
+   314→   314→              : `**Action failed.** ${res.result?.summary ?? "Unknown error"}`,
+   315→   315→            toolTraces: [],
+   316→   316→            createdAt: new Date().toISOString(),
+   317→   317→          },
+   318→   318→        ]);
+   319→   319→      } else {
+   320→   320→        toast.info("Action cancelled — nothing was changed");
+   321→   321→        setMessages((m) => [
+   322→   322→          ...m,
+   323→   323→          { id: `sys-${Date.now()}`, role: "ASSISTANT", content: "**Cancelled.** No changes were made.", toolTraces: [], createdAt: new Date().toISOString() },
+   324→   324→        ]);
+   325→   325→      }
+   326→   326→      setPending(null);
+   327→   327→    } catch (e) {
+   328→   328→      toast.error(e instanceof Error ? e.message : "Failed to resolve action");
+   329→   329→    }
+   330→   330→  };
+   331→   331→
+   332→   332→  const regenerate = async () => {
+   333→   333→    const lastUser = [...messages].reverse().find((m) => m.role === "USER");
+   334→   334→    if (!lastUser) return;
+   335→   335→    setMessages((m) => (m[m.length - 1]?.role === "ASSISTANT" ? m.slice(0, -1) : m));
+   336→   336→    await send(lastUser.content);
+   337→   337→  };
+   338→   338→
+   339→   339→  const isDemo = session.llmMode === "demo";
+   340→   340→
+   341→   341→  return (
+   342→   342→    <div className="flex h-[calc(100vh-11.5rem)] min-h-[32rem] flex-col gap-4 lg:flex-row">
+   343→   343→      {/* Conversation list */}
+   344→   344→      <aside className={cn("w-full shrink-0 lg:w-64", mobileListOpen ? "block" : "hidden lg:block")}>
+   345→   345→        <Card className="flex h-full flex-col p-0 gap-0">
+   346→   346→          <div className="flex items-center justify-between p-3">
+   347→   347→            <p className="text-sm font-medium">Conversations</p>
+   348→   348→            <Button size="sm" variant="outline" className="h-8" onClick={newConversation}>
+   349→   349→              <MessageSquarePlus className="mr-1 h-3.5 w-3.5" /> New
+   350→   350→            </Button>
+   351→   351→          </div>
+   352→   352→          <Separator />
+   353→   353→          <ScrollArea className="h-full max-h-[calc(100vh-16rem)] flex-1 lm-scroll">
+   354→   354→            <div className="space-y-1 p-2">
+   355→   355→              {conversations.length === 0 && <p className="px-2 py-6 text-center text-xs text-muted-foreground">No conversations yet</p>}
+   356→   356→              {conversations.map((c) => (
+   357→   357→                <div
+   358→   358→                  key={c.id}
+   359→   359→                  className={cn(
+   360→   360→                    "group flex cursor-pointer items-start justify-between gap-2 rounded-md px-2 py-2 text-sm transition-colors",
+   361→   361→                    conversationId === c.id ? "bg-[var(--lm-brand-soft)] text-[var(--lm-brand)]" : "hover:bg-muted",
+   362→   362→                  )}
+   363→   363→                  onClick={() => {
+   364→   364→                    navigate("copilot", { conversationId: c.id });
+   365→   365→                    setMobileListOpen(false);
+   366→   366→                  }}
+   367→   367→                  role="button"
+   368→   368→                  tabIndex={0}
+   369→   369→                  onKeyDown={(e) => e.key === "Enter" && navigate("copilot", { conversationId: c.id })}
+   370→   370→                >
+   371→   371→                  <div className="min-w-0">
+   372→   372→                    <p className="truncate font-medium">{c.title}</p>
+   373→   373→                    <p className="truncate text-xs text-muted-foreground">{fmtRelative(c.updatedAt)} · {c.mode === "DEMO" ? "demo" : "llm"}</p>
+   374→   374→                  </div>
+   375→   375→                  <button
+   376→   376→                    className="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-rose-500 group-hover:opacity-100"
+   377→   377→                    aria-label={`Delete conversation ${c.title}`}
+   378→   378→                    onClick={(e) => {
+   379→   379→                      e.stopPropagation();
+   380→   380→                      deleteConversation(c.id);
+   381→   381→                    }}
+   382→   382→                  >
+   383→   383→                    <Trash2 className="h-3.5 w-3.5" />
+   384→   384→                  </button>
+   385→   385→                </div>
+   386→   386→              ))}
+   387→   387→            </div>
+   388→   388→          </ScrollArea>
+   389→   389→        </Card>
+   390→   390→      </aside>
+   391→   391→
+   392→   392→      {/* Chat column */}
+   393→   393→      <div className="flex min-w-0 flex-1 flex-col">
+   394→   394→        <Card className="flex min-h-0 flex-1 flex-col p-0 gap-0">
+   395→   395→          {/* Chat header */}
+   396→   396→          <div className="flex items-center justify-between gap-2 border-b px-4 py-2.5">
+   397→   397→            <div className="flex min-w-0 items-center gap-2">
+   398→   398→              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[var(--lm-brand-soft)] ring-1 ring-[var(--lm-brand)]/30">
+   399→   399→                <BrainCircuit className="h-4 w-4 text-[var(--lm-brand)]" />
+   400→   400→              </div>
+   401→   401→              <div className="min-w-0">
+   402→   402→                <p className="truncate text-sm font-medium">LeadMind Copilot</p>
+   403→   403→                {contextLead ? (
+   404→   404→                  <p className="truncate text-xs text-muted-foreground">
+   405→   405→                    Context: {contextLead.label}
+   406→   406→                    <button className="ml-2 text-[var(--lm-brand)] hover:underline" onClick={() => navigate("lead", { leadId: contextLead.id })}>
+   407→   407→                      open profile
+   408→   408→                    </button>
+   409→   409→                    <button className="ml-2 text-muted-foreground hover:underline" onClick={() => navigate("copilot")}>
+   410→   410→                      clear
+   411→   411→                    </button>
+   412→   412→                  </p>
+   413→   413→                ) : (
+   414→   414→                  <p className="truncate text-xs text-muted-foreground">{isDemo ? "Local demo assistant — deterministic, live workspace data" : "Connected to external LLM"}</p>
+   415→   415→                )}
+   416→   416→              </div>
+   417→   417→            </div>
+   418→   418→            <div className="flex items-center gap-2">
+   419→   419→              <Badge variant="outline" className={cn("text-[10px]", isDemo ? "border-amber-500/40 text-amber-600 dark:text-amber-400" : "border-[var(--lm-brand)]/40 text-[var(--lm-brand)]")}>
+   420→   420→                {isDemo ? "DEMO MODE" : "LIVE LLM"}
+   421→   421→              </Badge>
+   422→   422→              {messages.length > 0 && (
+   423→   423→                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={regenerate} disabled={sending} aria-label="Regenerate last answer" title="Regenerate last answer">
+   424→   424→                  <RefreshCcw className="h-4 w-4" />
+   425→   425→                </Button>
+   426→   426→              )}
+   427→   427→              <Button variant="ghost" size="icon" className="h-8 w-8 lg:hidden" onClick={() => setMobileListOpen((v) => !v)} aria-label="Toggle conversation list">
+   428→   428→                <ChevronDown className="h-4 w-4" />
+   429→   429→              </Button>
+   430→   430→            </div>
+   431→   431→          </div>
+   432→   432→
+   433→   433→          {/* Messages */}
+   434→   434→          <ScrollArea className="min-h-0 flex-1 lm-scroll">
+   435→   435→            <div className="space-y-4 px-4 py-4">
+   436→   436→              {loadingThread ? (
+   437→   437→                <div className="space-y-3">
+   438→   438→                  <Skeleton className="h-16 w-2/3" />
+   439→   439→                  <Skeleton className="ml-auto h-24 w-3/4" />
+   440→   440→                  <Skeleton className="h-16 w-1/2" />
+   441→   441→                </div>
+   442→   442→              ) : messages.length === 0 ? (
+   443→   443→                <div className="py-10">
+   444→   444→                  <EmptyState
+   445→   445→                    icon={<BrainCircuit className="h-10 w-10" />}
+   446→   446→                    title="Ask your pipeline anything"
+   447→   447→                    description="The Copilot investigates real workspace data through validated tools — lead search, scoring explanations, analytics, recommendations and knowledge retrieval. It never invents records."
+   448→   448→                  />
+   449→   449→                  {suggestions.length > 0 && (
+   450→   450→                    <div className="mx-auto mt-4 flex max-w-2xl flex-wrap justify-center gap-2">
+   451→   451→                      {suggestions.map((s, i) => (
+   452→   452→                        <button
+   453→   453→                          key={i}
+   454→   454→                          onClick={() => send(s)}
+   455→   455→                          disabled={sending}
+   456→   456→                          className="rounded-full border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-[var(--lm-brand)]/40 hover:text-[var(--lm-brand)]"
+   457→   457→                        >
+   458→   458→                          {s}
+   459→   459→                        </button>
+   460→   460→                      ))}
+   461→   461→                    </div>
+   462→   462→                  )}
+   463→   463→                </div>
+   464→   464→              ) : (
+   465→   465→                messages.map((m) => (
+   466→   466→                  <div key={m.id} className={cn("flex gap-3", m.role === "USER" ? "justify-end" : "justify-start")}>
+   467→   467→                    {m.role === "ASSISTANT" && (
+   468→   468→                      <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[var(--lm-brand-soft)] ring-1 ring-[var(--lm-brand)]/30">
+   469→   469→                        <BrainCircuit className="h-4 w-4 text-[var(--lm-brand)]" />
+   470→   470→                      </div>
+   471→   471→                    )}
+   472→   472→                    <div className={cn("max-w-[85%] space-y-2 sm:max-w-[80%]", m.role === "USER" && "flex flex-col items-end")}>
+   473→   473→                      {m.toolTraces.length > 0 && <ToolTracePanel traces={m.toolTraces} />}
+   474→   474→                      <div
+   475→   475→                        className={cn(
+   476→   476→                          "rounded-2xl px-4 py-3",
+   477→   477→                          m.role === "USER"
+   478→   478→                            ? "bg-[var(--lm-brand)] text-[var(--primary-foreground)]"
+   479→   479→                            : "lm-panel border bg-card",
+   480→   480→                          m.streaming && m.content.length === 0 && "animate-pulse",
+   481→   481→                        )}
+   482→   482→                      >
+   483→   483→                        {m.role === "USER" ? (
+   484→   484→                          <p className="whitespace-pre-wrap text-sm">{m.content}</p>
+   485→   485→                        ) : (
+   486→   486→                          <div className={cn(m.streaming && "lm-caret")}>
+   487→   487→                            {m.content ? <Markdown content={m.content} /> : <p className="text-sm text-muted-foreground">…</p>}
+   488→   488→                          </div>
+   489→   489→                        )}
+   490→   490→                      </div>
+   491→   491→                      <div className="flex items-center gap-2 px-1 text-[10px] text-muted-foreground">
+   492→   492→                        <span>{fmtDateTime(m.createdAt)}</span>
+   493→   493→                        {m.role === "ASSISTANT" && !m.streaming && m.content.length > 0 && (
+   494→   494→                          <button
+   495→   495→                            className="inline-flex items-center gap-1 hover:text-foreground"
+   496→   496→                            aria-label="Copy response"
+   497→   497→                            onClick={() => {
+   498→   498→                              navigator.clipboard.writeText(m.content).then(
+   499→   499→                                () => toast.success("Copied to clipboard"),
+   500→   500→                                () => toast.error("Copy failed"),
+   501→   501→                              );
+   502→   502→                            }}
+   503→   503→                          >
+   504→   504→                            <Copy className="h-3 w-3" /> copy
+   505→   505→                          </button>
+   506→   506→                        )}
+   507→   507→                      </div>
+   508→   508→                    </div>
+   509→   509→                    {m.role === "USER" && (
+   510→   510→                      <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted">
+   511→   511→                        <User className="h-3.5 w-3.5 text-muted-foreground" />
+   512→   512→                      </div>
+   513→   513→                    )}
+   514→   514→                  </div>
+   515→   515→                ))
+   516→   516→              )}
+   517→   517→
+   518→   518→              {pending && (
+   519→   519→                <Card className="mx-auto w-full max-w-lg border-amber-500/40 bg-amber-50/60 dark:bg-amber-950/30">
+   520→   520→                  <CardContent className="space-y-3 p-4">
+   521→   521→                    <div className="flex items-center gap-2 text-sm font-medium">
+   522→   522→                      <Zap className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+   523→   523→                      Confirmation required
+   524→   524→                    </div>
+   525→   525→                    <p className="text-sm text-muted-foreground">{pending.summary}</p>
+   526→   526→                    <div className="flex gap-2">
+   527→   527→                      <Button size="sm" onClick={() => resolvePending("confirm")} className="bg-amber-600 text-white hover:bg-amber-500">
+   528→   528→                        <Check className="mr-1 h-3.5 w-3.5" /> Confirm & execute
+   529→   529→                      </Button>
+   530→   530→                      <Button size="sm" variant="ghost" onClick={() => resolvePending("cancel")}>
+   531→   531→                        <X className="mr-1 h-3.5 w-3.5" /> Cancel
+   532→   532→                      </Button>
+   533→   533→                    </div>
+   534→   534→                  </CardContent>
+   535→   535→                </Card>
+   536→   536→              )}
+   537→   537→
+   538→   538→              {statusLine && (
+   539→   539→                <div className="flex items-center gap-2 pl-10 text-xs text-muted-foreground">
+   540→   540→                  <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--lm-brand)]" /> {statusLine}
+   541→   541→                </div>
+   542→   542→              )}
+   543→   543→              <div ref={bottomRef} />
+   544→   544→            </div>
+   545→   545→          </ScrollArea>
+   546→   546→
+   547→   547→          {/* Composer */}
+   548→   548→          <div className="border-t p-3">
+   549→   549→            {messages.length === 0 && suggestions.length > 0 && (
+   550→   550→              <div className="mb-2 flex flex-wrap gap-1.5 lg:hidden">
+   551→   551→                {suggestions.slice(0, 3).map((s, i) => (
+   552→   552→                  <button key={i} onClick={() => send(s)} disabled={sending} className="rounded-full border px-2.5 py-1 text-[11px] text-muted-foreground">
+   553→   553→                    {s}
+   554→   554→                  </button>
+   555→   555→                ))}
+   556→   556→              </div>
+   557→   557→            )}
+   558→   558→            <div className="flex items-end gap-2">
+   559→   559→              <Textarea
+   560→   560→                value={input}
+   561→   561→                onChange={(e) => setInput(e.target.value)}
+   562→   562→                onKeyDown={(e) => {
+   563→   563→                  if (e.key === "Enter" && !e.shiftKey) {
+   564→   564→                    e.preventDefault();
+   565→   565→                    send(input);
+   566→   566→                  }
+   567→   567→                }}
+   568→   568→                placeholder="Ask about leads, scores, predictions, actions… (Enter to send, Shift+Enter for newline)"
+   569→   569→                className="min-h-[2.75rem] flex-1 resize-none"
+   570→   570→                rows={1}
+   571→   571→                aria-label="Message the copilot"
+   572→   572→                disabled={sending}
+   573→   573→              />
+   574→   574→              {sending ? (
+   575→   575→                <Button variant="destructive" size="icon" className="h-11 w-11" onClick={stop} aria-label="Stop generating">
+   576→   576→                  <X className="h-4 w-4" />
+   577→   577→                </Button>
+   578→   578→              ) : (
+   579→   579→                <LiquidGlassButton
+   580→   580→                  variant="brand"
+   581→   581→                  size="icon"
+   582→   582→                  className="h-11 w-11"
+   583→   583→                  onClick={() => send(input)}
+   584→   584→                  disabled={!input.trim()}
+   585→   585→                  aria-label="Send message"
+   586→   586→                >
+   587→   587→                  <Send className="h-4 w-4" />
+   588→   588→                </LiquidGlassButton>
+   589→   589→              )}
+   590→   590→            </div>
+   591→   591→          </div>
+   592→   592→        </Card>
+   593→   593→      </div>
+   594→   594→    </div>
+   595→   595→  );
+   596→   596→}
+   597→   597→
+   598→   598→function ToolTracePanel({ traces }: { traces: ToolTrace[] }) {
+   599→   599→  const [open, setOpen] = useState(false);
+   600→   600→  return (
+   601→   601→    <div className="w-full rounded-lg border bg-muted/40 text-xs">
+   602→   602→      <button className="flex w-full items-center gap-2 px-3 py-2 text-left" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+   603→   603→        <Wrench className="h-3.5 w-3.5 text-[var(--lm-brand)]" />
+   604→   604→        <span className="font-medium">{traces.length} tool execution{traces.length > 1 ? "s" : ""}</span>
+   605→   605→        <span className="truncate text-muted-foreground">{traces.map((t) => t.name).join(", ")}</span>
+   606→   606→        <ChevronDown className={cn("ml-auto h-3.5 w-3.5 transition-transform", open && "rotate-180")} />
+   607→   607→      </button>
+   608→   608→      {open && (
+   609→   609→        <div className="space-y-1.5 border-t px-3 py-2">
+   610→   610→          {traces.map((t, i) => (
+   611→   611→            <div key={i} className="flex items-start gap-2">
+   612→   612→              <span className={cn("mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full", t.ok ? "bg-emerald-500" : "bg-rose-500")} />
+   613→   613→              <div className="min-w-0 flex-1">
+   614→   614→                <p className="font-mono text-[11px]">{t.name} <span className="text-muted-foreground">({t.ms}ms)</span></p>
+   615→   615→                <p className="truncate text-muted-foreground">{t.ok ? t.summary : t.summary}</p>
+   616→   616→              </div>
+   617→   617→            </div>
+   618→   618→          ))}
+   619→   619→        </div>
+   620→   620→      )}
+   621→   621→    </div>
+   622→   622→  );
+   623→   623→}
+   624→   624→

@@ -191,6 +191,22 @@
     radial-gradient(480px 180px at 88% -12%, var(--lm-info-soft), transparent 72%);
 }
 
+/* Translucent copilot chat surface with corner lighting (scoped via [data-chat-surface]) */
+[data-chat-surface] {
+  position: relative;
+  isolation: isolate;
+}
+[data-chat-surface]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(420px 200px at 8% 0%, var(--lm-brand-soft), transparent 70%),
+    radial-gradient(380px 180px at 96% 4%, var(--lm-info-soft), transparent 72%);
+}
+
 /* Gradient brand text for hero metrics */
 .lm-brand-text {
   background: linear-gradient(100deg, var(--lm-brand), var(--lm-info));
