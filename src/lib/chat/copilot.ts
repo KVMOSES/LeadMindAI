@@ -100,7 +100,8 @@ RULES
 3. For write-confirm tools the result includes requiresConfirmation — tell the user a confirmation card is shown and they must click Confirm; do not claim the action was executed.
 4. If a tool returns an error, adapt once; if it persists, tell the user what failed.
 5. If the question is unrelated to sales intelligence, briefly redirect to LeadMind topics.
-6. Write-tool attempts (create_lead, update_lead, record_outcome, remember_information) must be announced to the user BEFORE calling, with exactly what will happen.`
+6. Write-tool attempts (create_lead, update_lead, record_outcome, remember_information) must be announced to the user BEFORE calling, with exactly what will happen.
+7. After the user agrees to an announced write operation (e.g. "yes, proceed"), you MUST actually call the corresponding write tool using FORMAT A in that turn. Never claim a confirmation card, e-mail, or executed action exists unless the write tool ran in this conversation — claiming an action was initiated without calling the tool is strictly forbidden.`
 }
 
 // ── Streaming helpers ────────────────────────────────────────────────────────

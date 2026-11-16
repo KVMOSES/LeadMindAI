@@ -1,0 +1,703 @@
+     1→"use client";
+     2→
+     3→import { useCallback, useEffect, useRef, useState } from "react";
+     4→import { useTheme } from "next-themes";
+     5→import { useAppStore, type ViewKey, type SessionData } from "@/lib/store";
+     6→import { api } from "@/lib/api";
+     7→import { cn } from "@/lib/utils";
+     8→import { toast } from "sonner";
+     9→import {
+    10→  Activity,
+    11→  Bell,
+    12→  BookUser,
+    13→  BrainCircuit,
+    14→  ChevronRight,
+    15→  CircleDot,
+    16→  ClipboardCheck,
+    17→  Command as CommandIcon,
+    18→  LayoutDashboard,
+    19→  Lightbulb,
+    20→  LogOut,
+    21→  MessagesSquare,
+    22→  Menu,
+    23→  MessageSquareHeart,
+    24→  Moon,
+    25→  PanelLeftClose,
+    26→  PanelLeftOpen,
+    27→  Search,
+    28→  Settings2,
+    29→  Sun,
+    30→  Users,
+    31→  Zap,
+    32→} from "lucide-react";
+    33→import { Button } from "@/components/ui/button";
+    34→import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+    35→import {
+    36→  CommandDialog,
+    37→  CommandEmpty,
+    38→  CommandGroup,
+    39→  CommandInput,
+    40→  CommandItem,
+    41→  CommandList,
+    42→  CommandSeparator,
+    43→} from "@/components/ui/command";
+    44→import {
+    45→  DropdownMenu,
+    46→  DropdownMenuContent,
+    47→  DropdownMenuItem,
+    48→  DropdownMenuLabel,
+    49→  DropdownMenuSeparator,
+    50→  DropdownMenuTrigger,
+    51→} from "@/components/ui/dropdown-menu";
+    52→import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+    53→import { DashboardView } from "@/components/lm/dashboard-view";
+    54→import { LeadsView } from "@/components/lm/leads-view";
+    55→import { LeadProfileView } from "@/components/lm/lead-profile-view";
+    56→import { ProfilesView } from "@/components/lm/profiles-view";
+    57→import { QualificationView } from "@/components/lm/qualification-view";
+    58→import { CopilotView } from "@/components/lm/copilot-view";
+    59→import { ActionsView } from "@/components/lm/actions-view";
+    60→import { ModelsView } from "@/components/lm/models-view";
+    61→import { ExplainabilityView } from "@/components/lm/explainability-view";
+    62→import { FeedbackView } from "@/components/lm/feedback-view";
+    63→import { MonitoringView } from "@/components/lm/monitoring-view";
+    64→import { SettingsView } from "@/components/lm/settings-view";
+    65→import { LogoMark, LogoWordmark } from "@/components/lm/logo";
+    66→
+    67→// ── Navigation model ─────────────────────────────────────────────────────────
+    68→
+    69→interface NavItem {
+    70→  key: ViewKey;
+    71→  label: string;
+    72→  icon: typeof LayoutDashboard;
+    73→  matchViews?: ViewKey[];
+    74→}
+    75→
+    76→const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
+    77→  {
+    78→    label: "Pipeline",
+    79→    items: [
+    80→      { key: "dashboard", label: "Command Center", icon: LayoutDashboard },
+    81→      { key: "leads", label: "Lead Universe", icon: Users, matchViews: ["lead"] },
+    82→      { key: "profiles", label: "Intelligence Profiles", icon: BookUser },
+    83→      { key: "qualification", label: "Qualification", icon: ClipboardCheck },
+    84→    ],
+    85→  },
+    86→  {
+    87→    label: "Assist",
+    88→    items: [
+    89→      { key: "actions", label: "Next Best Action", icon: Zap },
+    90→      { key: "copilot", label: "AI Copilot", icon: MessagesSquare },
+    91→    ],
+    92→  },
+    93→  {
+    94→    label: "Model Ops",
+    95→    items: [
+    96→      { key: "models", label: "Model Intelligence", icon: BrainCircuit },
+    97→      { key: "explainability", label: "Explainability Studio", icon: Lightbulb },
+    98→      { key: "feedback", label: "Feedback & Learning", icon: MessageSquareHeart },
+    99→      { key: "monitoring", label: "Monitoring", icon: Activity },
+   100→    ],
+   101→  },
+   102→  {
+   103→    label: "Workspace",
+   104→    items: [{ key: "settings", label: "Settings", icon: Settings2 }],
+   105→  },
+   106→];
+   107→
+   108→const ALL_NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
+   109→
+   110→function navLabelFor(view: ViewKey): string {
+   111→  if (view === "lead") return "Lead Universe";
+   112→  return ALL_NAV_ITEMS.find((item) => item.key === view)?.label ?? "Command Center";
+   113→}
+   114→
+   115→// ── Brand mark ───────────────────────────────────────────────────────────────
+   116→
+   117→function BrandMark({ compact = false }: { compact?: boolean }) {
+   118→  return (
+   119→    <div className={cn("flex items-center gap-2.5", compact && "justify-center")}>
+   120→      <LogoMark size={compact ? 28 : 32} />
+   121→      {!compact && <LogoWordmark />}
+   122→    </div>
+   123→  );
+   124→}
+   125→
+   126→// ── Main shell ───────────────────────────────────────────────────────────────
+   127→
+   128→export function AppShell({ session, onLogout }: { session: SessionData; onLogout?: () => void }) {
+   129→  const view = useAppStore((s) => s.view);
+   130→  const navigate = useAppStore((s) => s.navigate);
+   131→  const syncFromHash = useAppStore((s) => s.syncFromHash);
+   132→  const setSession = useAppStore((s) => s.setSession);
+   133→  const activeLeadId = useAppStore((s) => s.activeLeadId);
+   134→  const { theme, setTheme } = useTheme();
+   135→
+   136→  const [collapsed, setCollapsed] = useState(() => {
+   137→    // The shell only mounts client-side after auth, so localStorage is safe here.
+   138→    if (typeof window === "undefined") return false;
+   139→    return window.localStorage.getItem("lm.sidebar.collapsed") === "1";
+   140→  });
+   141→  const [mobileOpen, setMobileOpen] = useState(false);
+   142→  const [paletteOpen, setPaletteOpen] = useState(false);
+   143→  const [notifOpen, setNotifOpen] = useState(false);
+   144→
+   145→  const toggleCollapsed = useCallback(() => {
+   146→    setCollapsed((prev) => {
+   147→      const next = !prev;
+   148→      window.localStorage.setItem("lm.sidebar.collapsed", next ? "1" : "0");
+   149→      return next;
+   150→    });
+   151→  }, []);
+   152→
+   153→  // Hash routing sync
+   154→  useEffect(() => {
+   155→    syncFromHash();
+   156→    const onPop = () => syncFromHash();
+   157→    window.addEventListener("popstate", onPop);
+   158→    return () => window.removeEventListener("popstate", onPop);
+   159→  }, [syncFromHash]);
+   160→
+   161→  // Global command palette shortcut
+   162→  useEffect(() => {
+   163→    const onKey = (e: KeyboardEvent) => {
+   164→      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+   165→        e.preventDefault();
+   166→        setPaletteOpen((open) => !open);
+   167→      }
+   168→    };
+   169→    window.addEventListener("keydown", onKey);
+   170→    return () => window.removeEventListener("keydown", onKey);
+   171→  }, []);
+   172→
+   173→  const logout = async () => {
+   174→    try {
+   175→      await api("/api/auth/logout", { method: "POST", body: {} });
+   176→    } catch {
+   177→      // ignore network failures on logout
+   178→    }
+   179→    setSession(null);
+   180→    // Notify the host (page.tsx owns the session state) so the login screen renders.
+   181→    onLogout?.();
+   182→    toast.success("Signed out");
+   183→  };
+   184→
+   185→  const isActive = (item: NavItem) => item.matchViews?.includes(view) || view === item.key;
+   186→
+   187→  return (
+   188→    <div className="flex min-h-screen flex-col bg-background">
+   189→      <div className="flex flex-1">
+   190→        {/* ── Desktop sidebar ─────────────────────────────────────────────── */}
+   191→        <aside
+   192→          className={cn(
+   193→            "fixed inset-y-0 left-0 z-40 hidden flex-col border-r bg-[var(--lm-sidebar)] transition-[width] duration-200 md:flex",
+   194→            collapsed ? "w-[64px]" : "w-60",
+   195→          )}
+   196→          style={{ background: "var(--lm-sidebar)" }}
+   197→          aria-label="Primary navigation"
+   198→        >
+   199→          <div className={cn("flex h-14 items-center border-b px-3", collapsed ? "justify-center" : "justify-between")}>
+   200→            <button onClick={() => navigate("dashboard")} aria-label="LeadMind AI home" className="min-w-0">
+   201→              <BrandMark compact={collapsed} />
+   202→            </button>
+   203→            {!collapsed && (
+   204→              <Button
+   205→                variant="ghost"
+   206→                size="icon"
+   207→                className="h-7 w-7 text-zinc-400 hover:text-zinc-200"
+   208→                onClick={toggleCollapsed}
+   209→                aria-label="Collapse sidebar"
+   210→              >
+   211→                <PanelLeftClose className="size-4" />
+   212→              </Button>
+   213→            )}
+   214→          </div>
+   215→          {collapsed && (
+   216→            <button
+   217→              onClick={toggleCollapsed}
+   218→              className="mx-auto mt-2 flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 hover:bg-[var(--lm-sidebar-hover)] hover:text-zinc-200"
+   219→              aria-label="Expand sidebar"
+   220→            >
+   221→              <PanelLeftOpen className="size-4" />
+   222→            </button>
+   223→          )}
+   224→
+   225→          <nav className={cn("lm-scroll mt-4 flex-1 space-y-5 overflow-y-auto px-3 pb-4", collapsed && "px-2")} aria-label="Primary">
+   226→            {NAV_GROUPS.map((group) => (
+   227→              <div key={group.label}>
+   228→                {!collapsed && (
+   229→                  <p className="mb-1.5 px-2 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
+   230→                    {group.label}
+   231→                  </p>
+   232→                )}
+   233→                <ul className="space-y-0.5">
+   234→                  {group.items.map((item) => {
+   235→                    const active = isActive(item);
+   236→                    return (
+   237→                      <li key={item.key}>
+   238→                        <button
+   239→                          onClick={() => navigate(item.key)}
+   240→                          aria-current={active ? "page" : undefined}
+   241→                          title={collapsed ? item.label : undefined}
+   242→                          className={cn(
+   243→                            "group relative flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-colors",
+   244→                            collapsed && "justify-center px-0",
+   245→                            active
+   246→                              ? "bg-[var(--lm-brand-soft)] font-medium text-[var(--lm-brand)]"
+   247→                              : "text-zinc-400 hover:bg-[var(--lm-sidebar-hover)] hover:text-zinc-100",
+   248→                          )}
+   249→                        >
+   250→                          {active && (
+   251→                            <span
+   252→                              className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-[var(--lm-brand)]"
+   253→                              aria-hidden="true"
+   254→                            />
+   255→                          )}
+   256→                          <item.icon className="size-4 shrink-0" aria-hidden="true" />
+   257→                          {!collapsed && <span className="truncate">{item.label}</span>}
+   258→                        </button>
+   259→                      </li>
+   260→                    );
+   261→                  })}
+   262→                </ul>
+   263→              </div>
+   264→            ))}
+   265→          </nav>
+   266→
+   267→          <div className={cn("border-t p-3", collapsed && "px-2")}>
+   268→            {!collapsed ? (
+   269→              <div className="rounded-lg bg-[var(--lm-sidebar-hover)] p-3 text-zinc-200">
+   270→                <div className="flex items-center gap-2">
+   271→                  <CircleDot
+   272→                    className={cn("size-3.5", session.llmMode === "live" ? "text-emerald-400" : "text-amber-400")}
+   273→                    aria-hidden="true"
+   274→                  />
+   275→                  <p className="text-xs font-medium">{session.llmMode === "live" ? "External LLM connected" : "Local demo assistant"}</p>
+   276→                </div>
+   277→                <p className="mt-1 truncate text-[11px] text-zinc-400" title={session.user.email}>
+   278→                  {session.user.email}
+   279→                </p>
+   280→                <Button variant="ghost" size="sm" className="mt-2 h-7 w-full justify-start text-xs text-zinc-400 hover:text-zinc-200" onClick={logout}>
+   281→                  <LogOut className="size-3.5" aria-hidden="true" />
+   282→                  Sign out
+   283→                </Button>
+   284→              </div>
+   285→            ) : (
+   286→              <button
+   287→                onClick={logout}
+   288→                className="mx-auto flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 hover:bg-[var(--lm-sidebar-hover)] hover:text-zinc-200"
+   289→                aria-label="Sign out"
+   290→              >
+   291→                <LogOut className="size-4" />
+   292→              </button>
+   293→            )}
+   294→          </div>
+   295→        </aside>
+   296→
+   297→        {/* ── Main column ─────────────────────────────────────────────────── */}
+   298→        <div className={cn("flex min-w-0 flex-1 flex-col transition-[padding] duration-200", collapsed ? "md:pl-[64px]" : "md:pl-60")}>
+   299→          {/* Topbar */}
+   300→          <header className="sticky top-0 z-30 border-b bg-background/85 backdrop-blur">
+   301→            <div className="flex h-14 items-center gap-2 px-4 sm:px-6">
+   302→              <Button
+   303→                variant="ghost"
+   304→                size="icon"
+   305→                className="h-8 w-8 md:hidden"
+   306→                onClick={() => setMobileOpen(true)}
+   307→                aria-label="Open navigation"
+   308→              >
+   309→                <Menu className="size-4" />
+   310→              </Button>
+   311→
+   312→              {/* Breadcrumbs */}
+   313→              <nav aria-label="Breadcrumb" className="hidden min-w-0 items-center gap-1 text-sm sm:flex">
+   314→                <span className="truncate text-muted-foreground">{session.workspace.name}</span>
+   315→                <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/60" aria-hidden="true" />
+   316→                <span className="truncate font-medium" aria-current="page">
+   317→                  {navLabelFor(view)}
+   318→                </span>
+   319→              </nav>
+   320→              <span className="truncate text-sm font-medium sm:hidden">{navLabelFor(view)}</span>
+   321→
+   322→              <div className="ml-auto flex items-center gap-1.5">
+   323→                {/* Global search */}
+   324→                <button
+   325→                  onClick={() => setPaletteOpen(true)}
+   326→                  className="hidden h-8 items-center gap-2 rounded-md border bg-muted/50 px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted sm:flex"
+   327→                  aria-label="Open global search"
+   328→                >
+   329→                  <Search className="size-3.5" aria-hidden="true" />
+   330→                  <span className="pr-4">Search leads…</span>
+   331→                  <kbd className="pointer-events-none inline-flex items-center gap-0.5 rounded border bg-muted px-1 font-mono text-[10px] font-medium text-muted-foreground">
+   332→                    <CommandIcon className="size-2.5" aria-hidden="true" />K
+   333→                  </kbd>
+   334→                </button>
+   335→                <Button
+   336→                  variant="ghost"
+   337→                  size="icon"
+   338→                  className="h-8 w-8 sm:hidden"
+   339→                  onClick={() => setPaletteOpen(true)}
+   340→                  aria-label="Open global search"
+   341→                >
+   342→                  <Search className="size-4" />
+   343→                </Button>
+   344→
+   345→                {/* Notifications (live operational signals) */}
+   346→                <NotificationsPopover
+   347→                  open={notifOpen}
+   348→                  onOpenChange={setNotifOpen}
+   349→                  llmMode={session.llmMode}
+   350→                  hasProductionModel={session.hasProductionModel}
+   351→                />
+   352→
+   353→                {/* Theme */}
+   354→                <Button
+   355→                  variant="ghost"
+   356→                  size="icon"
+   357→                  className="h-8 w-8"
+   358→                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+   359→                  aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+   360→                >
+   361→                  {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+   362→                </Button>
+   363→
+   364→                {/* User */}
+   365→                <DropdownMenu>
+   366→                  <DropdownMenuTrigger asChild>
+   367→                    <button
+   368→                      className="flex h-8 items-center gap-2 rounded-full border bg-muted/50 pl-1 pr-2.5 transition-colors hover:bg-muted"
+   369→                      aria-label="Open user menu"
+   370→                    >
+   371→                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--lm-brand-soft)] text-[11px] font-semibold text-[var(--lm-brand)]">
+   372→                        {(session.user.name ?? session.user.email).charAt(0).toUpperCase()}
+   373→                      </span>
+   374→                      <span className="hidden max-w-28 truncate text-xs font-medium sm:inline">
+   375→                        {session.user.name ?? session.user.email}
+   376→                      </span>
+   377→                    </button>
+   378→                  </DropdownMenuTrigger>
+   379→                  <DropdownMenuContent align="end" className="w-56">
+   380→                    <DropdownMenuLabel className="space-y-0.5">
+   381→                      <p className="truncate text-sm font-medium">{session.user.name ?? session.user.email}</p>
+   382→                      <p className="truncate text-xs font-normal text-muted-foreground">{session.user.email}</p>
+   383→                      <p className="pt-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+   384→                        {session.user.role} · {session.workspace.name}
+   385→                      </p>
+   386→                    </DropdownMenuLabel>
+   387→                    <DropdownMenuSeparator />
+   388→                    <DropdownMenuItem onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+   389→                      {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+   390→                      {theme === "dark" ? "Light theme" : "Dark theme"}
+   391→                    </DropdownMenuItem>
+   392→                    <DropdownMenuSeparator />
+   393→                    <DropdownMenuItem onClick={logout} className="text-rose-600 focus:text-rose-600 dark:text-rose-400">
+   394→                      <LogOut className="size-4" aria-hidden="true" />
+   395→                      Sign out
+   396→                    </DropdownMenuItem>
+   397→                  </DropdownMenuContent>
+   398→                </DropdownMenu>
+   399→              </div>
+   400→            </div>
+   401→          </header>
+   402→
+   403→          {/* Page content */}
+   404→          <main className="lm-dotgrid min-h-0 flex-1 px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
+   405→            <div className="lm-fade-up relative mx-auto w-full max-w-[1400px] space-y-5" key={view + (activeLeadId ?? "")}>
+   406→              {view === "dashboard" && <DashboardView session={session} />}
+   407→              {view === "leads" && <LeadsView session={session} />}
+   408→              {view === "lead" && <LeadProfileView session={session} />}
+   409→              {view === "profiles" && <ProfilesView session={session} />}
+   410→              {view === "qualification" && <QualificationView session={session} />}
+   411→              {view === "copilot" && <CopilotView session={session} />}
+   412→              {view === "actions" && <ActionsView session={session} />}
+   413→              {view === "models" && <ModelsView session={session} />}
+   414→              {view === "explainability" && <ExplainabilityView session={session} />}
+   415→              {view === "feedback" && <FeedbackView session={session} />}
+   416→              {view === "monitoring" && <MonitoringView session={session} />}
+   417→              {view === "settings" && <SettingsView session={session} />}
+   418→            </div>
+   419→          </main>
+   420→
+   421→          {/* Sticky footer */}
+   422→          <footer className="mt-auto border-t bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6">
+   423→            <div className="mx-auto flex w-full max-w-[1400px] items-center justify-between gap-4 text-xs text-muted-foreground">
+   424→              <span className="flex items-center gap-2">
+   425→                <LogoMark size={16} badge={false} aria-hidden="true" />
+   426→                LeadMind AI — conversational sales intelligence · {session.workspace.name}
+   427→              </span>
+   428→              <span className="hidden sm:inline">
+   429→                Fit &amp; intent engines · ML predictions · Copilot {session.llmMode === "live" ? "(live LLM)" : "(demo assistant)"}
+   430→              </span>
+   431→            </div>
+   432→          </footer>
+   433→        </div>
+   434→      </div>
+   435→
+   436→      {/* ── Mobile navigation sheet ────────────────────────────────────────── */}
+   437→      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+   438→        <SheetContent side="left" className="w-72 border-r bg-[var(--lm-sidebar)] p-0">
+   439→          <SheetHeader className="border-b px-4 py-3.5">
+   440→            <SheetTitle asChild>
+   441→              <div>
+   442→                <BrandMark />
+   443→              </div>
+   444→            </SheetTitle>
+   445→          </SheetHeader>
+   446→          <nav className="lm-scroll space-y-5 overflow-y-auto px-3 py-4" aria-label="Mobile">
+   447→            {NAV_GROUPS.map((group) => (
+   448→              <div key={group.label}>
+   449→                <p className="mb-1.5 px-2 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
+   450→                  {group.label}
+   451→                </p>
+   452→                <ul className="space-y-0.5">
+   453→                  {group.items.map((item) => {
+   454→                    const active = isActive(item);
+   455→                    return (
+   456→                      <li key={item.key}>
+   457→                        <button
+   458→                          onClick={() => {
+   459→                            navigate(item.key);
+   460→                            setMobileOpen(false);
+   461→                          }}
+   462→                          aria-current={active ? "page" : undefined}
+   463→                          className={cn(
+   464→                            "flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-colors",
+   465→                            active
+   466→                              ? "bg-[var(--lm-brand-soft)] font-medium text-[var(--lm-brand)]"
+   467→                              : "text-muted-foreground hover:bg-[var(--lm-sidebar-hover)] hover:text-foreground",
+   468→                          )}
+   469→                        >
+   470→                          <item.icon className="size-4 shrink-0" aria-hidden="true" />
+   471→                          <span className="truncate">{item.label}</span>
+   472→                        </button>
+   473→                      </li>
+   474→                    );
+   475→                  })}
+   476→                </ul>
+   477→              </div>
+   478→            ))}
+   479→          </nav>
+   480→          <div className="border-t px-3 py-3">
+   481→            <p className="flex items-center gap-2 text-xs text-muted-foreground">
+   482→              <CircleDot className={cn("size-3", session.llmMode === "live" ? "text-emerald-400" : "text-amber-400")} aria-hidden="true" />
+   483→              {session.llmMode === "live" ? "External LLM connected" : "Local demo assistant"}
+   484→            </p>
+   485→          </div>
+   486→        </SheetContent>
+   487→      </Sheet>
+   488→
+   489→      {/* ── Global command palette ─────────────────────────────────────────── */}
+   490→      <GlobalPalette open={paletteOpen} onOpenChange={setPaletteOpen} onNavigate={() => setPaletteOpen(false)} />
+   491→    </div>
+   492→  );
+   493→}
+   494→
+   495→// ── Notifications popover (real signals only) ────────────────────────────────
+   496→
+   497→interface NotifItem {
+   498→  id: string;
+   499→  title: string;
+   500→  detail: string;
+   501→  severity: "ok" | "info" | "warning" | "critical";
+   502→}
+   503→
+   504→function NotificationsPopover({
+   505→  open,
+   506→  onOpenChange,
+   507→  llmMode,
+   508→  hasProductionModel,
+   509→}: {
+   510→  open: boolean;
+   511→  onOpenChange: (v: boolean) => void;
+   512→  llmMode: "live" | "demo";
+   513→  hasProductionModel: boolean;
+   514→}) {
+   515→  const [items, setItems] = useState<NotifItem[] | null>(null);
+   516→  const loadingRef = useRef(false);
+   517→
+   518→  useEffect(() => {
+   519→    if (!open || loadingRef.current) return;
+   520→    loadingRef.current = true;
+   521→    Promise.all([
+   522→      api<{ report: { status: string; overallPsi: number } | null }>("/api/monitoring/drift").catch(() => ({ report: null })),
+   523→      api<{ report: { issues: string[] } | null }>("/api/monitoring/quality").catch(() => ({ report: null })),
+   524→    ]).then(([drift, quality]) => {
+   525→      const list: NotifItem[] = [];
+   526→      list.push({
+   527→        id: "llm",
+   528→        title: llmMode === "live" ? "Copilot: external LLM connected" : "Copilot: local demo assistant",
+   529→        detail: llmMode === "live" ? "Live model answering with tools." : "Deterministic assistant using live workspace data.",
+   530→        severity: llmMode === "live" ? "ok" : "warning",
+   531→      });
+   532→      list.push({
+   533→        id: "model",
+   534→        title: hasProductionModel ? "Production model active" : "No production model",
+   535→        detail: hasProductionModel ? "Conversion predictions are enabled." : "Train a model to enable predictions.",
+   536→        severity: hasProductionModel ? "ok" : "warning",
+   537→      });
+   538→      if (drift.report) {
+   539→        list.push({
+   540→          id: "drift",
+   541→          title: `Feature drift: ${drift.report.status}`,
+   542→          detail: `Overall PSI ${drift.report.overallPsi.toFixed(3)}.`,
+   543→          severity: drift.report.status === "STABLE" ? "ok" : drift.report.status === "WARNING" ? "warning" : "critical",
+   544→        });
+   545→      }
+   546→      if (quality.report) {
+   547→        const n = quality.report.issues.length;
+   548→        list.push({
+   549→          id: "quality",
+   550→          title: n === 0 ? "Data quality: no issues" : `Data quality: ${n} issue${n === 1 ? "" : "s"}`,
+   551→          detail: n === 0 ? "All scanned fields look healthy." : quality.report.issues[0],
+   552→          severity: n === 0 ? "ok" : n <= 2 ? "warning" : "critical",
+   553→        });
+   554→      }
+   555→      setItems(list);
+   556→      loadingRef.current = false;
+   557→    });
+   558→  }, [open, llmMode, hasProductionModel]);
+   559→
+   560→  const hasAttention = (items ?? []).some((i) => i.severity === "warning" || i.severity === "critical");
+   561→
+   562→  return (
+   563→    <Popover open={open} onOpenChange={onOpenChange}>
+   564→      <PopoverTrigger asChild>
+   565→        <Button variant="ghost" size="icon" className="relative h-8 w-8" aria-label="Notifications">
+   566→          <Bell className="size-4" />
+   567→          {hasAttention && (
+   568→            <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true" />
+   569→          )}
+   570→        </Button>
+   571→      </PopoverTrigger>
+   572→      <PopoverContent align="end" className="w-80 p-0">
+   573→        <div className="border-b px-3 py-2.5">
+   574→          <p className="text-sm font-medium">System signals</p>
+   575→          <p className="text-xs text-muted-foreground">Live operational status for this workspace</p>
+   576→        </div>
+   577→        <div className="lm-scroll max-h-80 overflow-y-auto p-1.5">
+   578→          {items === null ? (
+   579→            <p className="px-3 py-6 text-center text-xs text-muted-foreground">Loading signals…</p>
+   580→          ) : (
+   581→            items.map((item) => (
+   582→              <div key={item.id} className="flex items-start gap-2.5 rounded-md px-2.5 py-2">
+   583→                <span
+   584→                  className={cn(
+   585→                    "mt-1.5 h-2 w-2 shrink-0 rounded-full",
+   586→                    item.severity === "ok" && "bg-emerald-500",
+   587→                    item.severity === "info" && "bg-[var(--lm-info)]",
+   588→                    item.severity === "warning" && "bg-amber-500",
+   589→                    item.severity === "critical" && "bg-rose-500",
+   590→                  )}
+   591→                  aria-hidden="true"
+   592→                />
+   593→                <div className="min-w-0">
+   594→                  <p className="text-sm font-medium leading-tight">{item.title}</p>
+   595→                  <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{item.detail}</p>
+   596→                </div>
+   597→              </div>
+   598→            ))
+   599→          )}
+   600→        </div>
+   601→      </PopoverContent>
+   602→    </Popover>
+   603→  );
+   604→}
+   605→
+   606→// ── Global command palette ───────────────────────────────────────────────────
+   607→
+   608→interface LeadHit {
+   609→  id: string;
+   610→  companyName: string;
+   611→  contactName: string;
+   612→}
+   613→
+   614→function GlobalPalette({
+   615→  open,
+   616→  onOpenChange,
+   617→  onNavigate,
+   618→}: {
+   619→  open: boolean;
+   620→  onOpenChange: (v: boolean) => void;
+   621→  onNavigate: () => void;
+   622→}) {
+   623→  const navigate = useAppStore((s) => s.navigate);
+   624→  const [query, setQuery] = useState("");
+   625→  const [leadHits, setLeadHits] = useState<LeadHit[]>([]);
+   626→  const [searching, setSearching] = useState(false);
+   627→  const reqRef = useRef(0);
+   628→
+   629→  // Debounced live lead search
+   630→  useEffect(() => {
+   631→    const q = query.trim();
+   632→    if (q.length < 2) {
+   633→      setLeadHits([]);
+   634→      return;
+   635→    }
+   636→    const timer = setTimeout(async () => {
+   637→      const reqId = ++reqRef.current;
+   638→      setSearching(true);
+   639→      try {
+   640→        const res = await api<{ items: LeadHit[] }>(`/api/leads?query=${encodeURIComponent(q)}&pageSize=8`);
+   641→        if (reqId !== reqRef.current) return;
+   642→        setLeadHits(res.items ?? []);
+   643→      } catch {
+   644→        if (reqId === reqRef.current) setLeadHits([]);
+   645→      } finally {
+   646→        if (reqId === reqRef.current) setSearching(false);
+   647→      }
+   648→    }, 300);
+   649→    return () => clearTimeout(timer);
+   650→  }, [query]);
+   651→
+   652→  useEffect(() => {
+   653→    if (!open) {
+   654→      setQuery("");
+   655→      setLeadHits([]);
+   656→    }
+   657→  }, [open]);
+   658→
+   659→  const go = (fn: () => void) => {
+   660→    onNavigate();
+   661→    fn();
+   662→  };
+   663→
+   664→  return (
+   665→    <CommandDialog open={open} onOpenChange={onOpenChange} title="Global search" description="Search sections and leads">
+   666→      <CommandInput value={query} onValueChange={setQuery} placeholder="Search sections and leads…" />
+   667→      <CommandList className="max-h-[420px]">
+   668→        <CommandEmpty>{searching ? "Searching leads…" : "No results found."}</CommandEmpty>
+   669→        {leadHits.length > 0 && (
+   670→          <CommandGroup heading="Leads">
+   671→            {leadHits.map((lead) => (
+   672→              <CommandItem
+   673→                key={lead.id}
+   674→                value={`lead-${lead.companyName}-${lead.contactName}-${lead.id}`}
+   675→                onSelect={() => go(() => navigate("lead", { leadId: lead.id }))}
+   676→              >
+   677→                <Users className="size-4 text-muted-foreground" aria-hidden="true" />
+   678→                <span className="truncate">
+   679→                  <span className="font-medium">{lead.companyName}</span>
+   680→                  <span className="text-muted-foreground"> · {lead.contactName}</span>
+   681→                </span>
+   682→              </CommandItem>
+   683→            ))}
+   684→          </CommandGroup>
+   685→        )}
+   686→        <CommandSeparator />
+   687→        <CommandGroup heading="Navigate">
+   688→          {ALL_NAV_ITEMS.map((item) => (
+   689→            <CommandItem
+   690→              key={item.key}
+   691→              value={`nav-${item.label}`}
+   692→              onSelect={() => go(() => navigate(item.key))}
+   693→            >
+   694→              <item.icon className="size-4 text-muted-foreground" aria-hidden="true" />
+   695→              {item.label}
+   696→            </CommandItem>
+   697→          ))}
+   698→        </CommandGroup>
+   699→      </CommandList>
+   700→    </CommandDialog>
+   701→  );
+   702→}
+   703→

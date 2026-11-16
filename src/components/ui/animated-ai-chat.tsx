@@ -48,6 +48,7 @@ import { LogoMark } from "@/components/lm/logo";
  *   are disabled under `prefers-reduced-motion`.
  * - No attachment controls: the current backend has no file-upload endpoint,
  *   so none are rendered (no fake uploads).
+ * - Composer enforces the real backend limit (4000 characters).
  */
 
 // ── Shared types (consumed by copilot-view) ──────────────────────────────────
@@ -84,6 +85,9 @@ export interface CopilotCommand {
   /** When set, the message is sent immediately instead of filling the composer. */
   send?: string;
 }
+
+/** Real backend limit for a single chat message (see messages route zod schema). */
+const MAX_MESSAGE_LENGTH = 4000;
 
 /**
  * Commands map to capabilities that actually exist in the Copilot tool
@@ -158,28 +162,46 @@ function ToolTracePanel({ traces }: { traces: ToolTrace[] }) {
   const [open, setOpen] = React.useState(false);
   const allOk = traces.every((t) => t.ok);
   return (
-    <div className="w-full overflow-hidden rounded-xl border border-border/70 bg-muted/40 backdrop-blur-sm">
+    <div className="w-full overflow-hidden rounded-xl border border-border/70 bg-background/40 backdrop-blur-sm">
       <button
         type="button"
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs"
+        className="flex w-full flex-wrap items-center gap-1.5 px-3 py-2 text-left text-xs"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--lm-brand-soft)] ring-1 ring-[var(--lm-brand)]/25">
-          <Wrench className="h-3.5 w-3.5 text-[var(--lm-brand)]" aria-hidden="true" />
+        <span className="flex items-center gap-1.5 font-medium">
+          <span
+            className={cn(
+              "flex size-5 shrink-0 items-center justify-center rounded-md ring-1",
+              allOk
+                ? "bg-[var(--lm-brand-soft)] ring-[var(--lm-brand)]/25"
+                : "bg-rose-500/10 ring-rose-500/30",
+            )}
+          >
+            <Wrench className={cn("size-3", allOk ? "text-[var(--lm-brand)]" : "text-rose-500")} aria-hidden="true" />
+          </span>
+          {traces.length} tool execution{traces.length > 1 ? "s" : ""}
         </span>
-        <span className="font-medium">{traces.length} tool execution{traces.length > 1 ? "s" : ""}</span>
-        <span className="truncate text-muted-foreground">{traces.map((t) => t.name).join(", ")}</span>
-        <span
-          className={cn(
-            "ml-auto flex h-4 w-4 shrink-0 items-center justify-center rounded-full",
-            allOk ? "bg-emerald-500/15 text-emerald-500" : "bg-rose-500/15 text-rose-500",
+        <span className="flex max-w-full flex-wrap items-center gap-1">
+          {traces.slice(0, 3).map((t, i) => (
+            <span
+              key={i}
+              className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+            >
+              {t.name}
+              <span className={cn("size-1 rounded-full", t.ok ? "bg-emerald-500" : "bg-rose-500")} aria-hidden="true" />
+            </span>
+          ))}
+          {traces.length > 3 && (
+            <span className="rounded-full border border-border/60 bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+              +{traces.length - 3}
+            </span>
           )}
-          aria-hidden="true"
-        >
-          {allOk ? <Check className="h-2.5 w-2.5" /> : <X className="h-2.5 w-2.5" />}
         </span>
-        <ChevronDown className={cn("h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
+        <span className="ml-auto inline-flex items-center gap-1.5 text-[10px] text-muted-foreground">
+          {open ? "hide" : "evidence"}
+          <ChevronDown className={cn("size-3 transition-transform", open && "rotate-180")} aria-hidden="true" />
+        </span>
       </button>
       <AnimatePresence initial={false}>
         {open && (
@@ -190,23 +212,23 @@ function ToolTracePanel({ traces }: { traces: ToolTrace[] }) {
             transition={{ duration: 0.18 }}
             className="overflow-hidden"
           >
-            <div className="space-y-1.5 border-t border-border/70 px-3 py-2.5">
+            <div className="space-y-2 border-t border-border/70 px-3 py-2.5">
               {traces.map((t, i) => (
                 <div key={i} className="flex items-start gap-2">
                   <span
-                    className={cn("mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full", t.ok ? "bg-emerald-500" : "bg-rose-500")}
+                    className={cn("mt-1.5 size-1.5 shrink-0 rounded-full", t.ok ? "bg-emerald-500" : "bg-rose-500")}
                     aria-hidden="true"
                   />
                   <div className="min-w-0 flex-1">
                     <p className="font-mono text-[11px] font-medium">
-                      {t.name} <span className="font-sans text-muted-foreground">({t.ms}ms)</span>
+                      {t.name} <span className="font-sans font-normal text-muted-foreground">· {t.ms}ms</span>
                     </p>
                     <p className="text-[11px] leading-relaxed text-muted-foreground">{t.summary}</p>
                   </div>
                 </div>
               ))}
-              <p className="pt-1 text-[10px] text-muted-foreground/80">
-                Every answer above is grounded in these validated tool results — no fabricated records.
+              <p className="border-t border-border/60 pt-2 text-[10px] text-muted-foreground/80">
+                Every claim in the answer above is grounded in these validated tool results — no fabricated records.
               </p>
             </div>
           </motion.div>
@@ -302,6 +324,8 @@ export interface AnimatedAiChatProps {
   suggestions: string[];
   isDemo: boolean;
   contextLead: { id: string; label: string } | null;
+  /** Title of the active conversation, shown in the toolbar when present. */
+  conversationTitle?: string | null;
   onSend: (text: string) => void;
   onStop: () => void;
   onRetry: () => void;
@@ -323,6 +347,7 @@ export function AnimatedAiChat({
   suggestions,
   isDemo,
   contextLead,
+  conversationTitle,
   onSend,
   onStop,
   onRetry,
@@ -358,8 +383,14 @@ export function AnimatedAiChat({
   React.useLayoutEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
+    const resize = () => {
+      el.style.height = "auto";
+      el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
+    };
+    resize();
+    // Re-measure when the viewport changes so the placeholder never clips.
+    window.addEventListener("resize", resize);
+    return () => window.removeEventListener("resize", resize);
   }, [input]);
 
   // ── Scroll behaviour: follow only when the user is already at the bottom ──
@@ -377,6 +408,13 @@ export function AnimatedAiChat({
 
   const scrollToLatest = () => {
     bottomRef.current?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "end" });
+  };
+
+  const submitInput = () => {
+    const trimmed = input.trim();
+    if (!trimmed || sending) return;
+    setInput("");
+    onSend(expandSlashCommand(trimmed));
   };
 
   const selectCommand = (cmd: CopilotCommand) => {
@@ -426,26 +464,28 @@ export function AnimatedAiChat({
     }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (trimmedInput) {
-        setInput("");
-        onSend(expandSlashCommand(trimmedInput));
-      }
+      submitInput();
     }
   };
 
   const lastMsg = messages[messages.length - 1];
   const lastAssistantErrored = lastMsg?.role === "ASSISTANT" && !lastMsg.streaming && lastMsg.content.startsWith("**Error:**");
   const canRetry = !sending && messages.some((m) => m.role === "USER");
+  const nearLimit = input.length > MAX_MESSAGE_LENGTH - 400;
 
   return (
     <div className={cn("flex h-full min-h-0 w-full min-w-0 flex-col", className)} data-chat-surface="">
       {/* ── Chat toolbar ──────────────────────────────────────────────────── */}
-      <div className="relative z-10 flex items-center justify-between gap-2 border-b border-border/70 px-4 py-2.5">
-        <div className="flex min-w-0 items-center gap-2">
-          <LogoMark size={26} />
+      <div className="relative z-10 flex items-center justify-between gap-3 border-b border-border/70 px-4 py-2.5 sm:px-5">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <LogoMark size={28} />
           <div className="min-w-0">
-            <p className="truncate font-display text-sm font-bold">LeadMind Copilot</p>
-            {contextLead ? (
+            <p className="truncate font-display text-sm font-bold leading-tight">LeadMind Copilot</p>
+            {conversationTitle ? (
+              <p className="truncate text-xs text-muted-foreground" title={conversationTitle}>
+                {conversationTitle}
+              </p>
+            ) : contextLead ? (
               <p className="truncate text-xs text-muted-foreground">
                 Context:{" "}
                 <button type="button" className="font-medium text-[var(--lm-brand)] hover:underline" onClick={onOpenContextLead}>
@@ -463,6 +503,17 @@ export function AnimatedAiChat({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
+          {contextLead && conversationTitle && (
+            <button
+              type="button"
+              onClick={onOpenContextLead}
+              className="hidden max-w-[16rem] items-center truncate rounded-full border border-[var(--lm-brand)]/30 bg-[var(--lm-brand-soft)] px-2.5 py-0.5 text-[10.5px] font-medium text-[var(--lm-brand)] hover:border-[var(--lm-brand)]/60 xl:inline-flex"
+              title={`Open lead: ${contextLead.label}`}
+            >
+              <User className="mr-1 size-3" aria-hidden="true" />
+              {contextLead.label}
+            </button>
+          )}
           <span
             className={cn(
               "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium",
@@ -494,9 +545,9 @@ export function AnimatedAiChat({
       {/* ── Message stream ────────────────────────────────────────────────── */}
       <div className="relative min-h-0 flex-1">
         <div ref={scrollRef} onScroll={handleScroll} className="lm-scroll absolute inset-0 overflow-y-auto">
-          <div className="relative z-10 space-y-4 px-4 py-4">
+          <div className="relative z-10 mx-auto w-full max-w-[54rem] space-y-5 px-4 py-5 sm:px-6 sm:py-6">
             {loadingThread ? (
-              <div className="space-y-3" aria-label="Loading conversation">
+              <div className="space-y-4" aria-label="Loading conversation">
                 {[0, 1, 2].map((i) => (
                   <motion.div
                     key={i}
@@ -510,27 +561,27 @@ export function AnimatedAiChat({
               </div>
             ) : messages.length === 0 ? (
               <motion.div
-                className="flex flex-col items-center py-12 text-center"
+                className="flex flex-col items-center px-2 py-10 text-center sm:py-14"
                 initial={reduced ? false : { opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4 }}
               >
-                <div className="relative mb-4">
+                <div className="relative mb-5">
                   <div
                     aria-hidden="true"
                     className="absolute inset-0 -z-10 rounded-full blur-2xl"
                     style={{ background: "radial-gradient(closest-side, var(--lm-brand-soft), transparent)" }}
                   />
-                  <LogoMark size={56} />
+                  <LogoMark size={60} />
                 </div>
-                <p className="font-display text-base font-bold">Ask your pipeline anything</p>
-                <p className="mt-1.5 max-w-md text-sm leading-relaxed text-muted-foreground">
+                <p className="font-display text-lg font-bold tracking-tight sm:text-xl">Ask your pipeline anything</p>
+                <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
                   The Copilot investigates real workspace data through validated tools — lead search,
                   scoring explanations, analytics, recommendations and knowledge retrieval. It never
                   invents records.
                 </p>
                 {suggestions.length > 0 && (
-                  <div className="mt-5 flex max-w-2xl flex-wrap justify-center gap-2">
+                  <div className="mt-6 flex max-w-2xl flex-wrap justify-center gap-2">
                     {suggestions.map((s, i) => (
                       <motion.button
                         key={i}
@@ -547,6 +598,21 @@ export function AnimatedAiChat({
                     ))}
                   </div>
                 )}
+                <div className="mt-5 flex flex-wrap items-center justify-center gap-1.5" aria-label="Slash command shortcuts">
+                  {COPILOT_COMMANDS.filter((c) => !c.send).map((c) => (
+                    <button
+                      key={c.command}
+                      type="button"
+                      disabled={sending}
+                      onClick={() => selectCommand(c)}
+                      title={`${c.label} — ${c.hint}`}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-muted/30 px-2 py-1 font-mono text-[10.5px] text-muted-foreground transition-colors hover:border-[var(--lm-brand)]/40 hover:text-[var(--lm-brand)] disabled:opacity-50"
+                    >
+                      <c.icon className="size-3" aria-hidden="true" />
+                      {c.command}
+                    </button>
+                  ))}
+                </div>
               </motion.div>
             ) : (
               <AnimatePresence initial={false} mode="popLayout">
@@ -561,18 +627,23 @@ export function AnimatedAiChat({
                     className={cn("flex gap-3", m.role === "USER" ? "justify-end" : "justify-start")}
                   >
                     {m.role === "ASSISTANT" && (
-                      <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[var(--lm-brand-soft)] ring-1 ring-[var(--lm-brand)]/25">
+                      <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-[var(--lm-brand-soft)] ring-1 ring-[var(--lm-brand)]/25">
                         <LogoMark size={18} badge={false} />
                       </div>
                     )}
-                    <div className={cn("min-w-0 max-w-[85%] space-y-2 sm:max-w-[78%]", m.role === "USER" && "flex flex-col items-end")}>
+                    <div
+                      className={cn(
+                        "min-w-0 space-y-2",
+                        m.role === "USER" ? "flex max-w-[85%] flex-col items-end sm:max-w-[75%]" : "w-full min-w-0 max-w-[calc(100%-2.25rem)] sm:max-w-[calc(100%-2.5rem)]",
+                      )}
+                    >
                       {m.toolTraces.length > 0 && <ToolTracePanel traces={m.toolTraces} />}
                       <div
                         className={cn(
-                          "rounded-2xl px-4 py-3 text-sm",
+                          "text-sm",
                           m.role === "USER"
-                            ? "rounded-br-md bg-[linear-gradient(135deg,var(--lm-brand),color-mix(in_oklab,var(--lm-brand),var(--lm-info)_35%))] text-white shadow-[0_6px_18px_-8px_var(--lm-brand)]"
-                            : "rounded-bl-md border border-border/70 bg-card/85 backdrop-blur-md",
+                            ? "rounded-2xl rounded-br-md bg-[linear-gradient(135deg,var(--lm-brand),color-mix(in_oklab,var(--lm-brand),var(--lm-info)_35%))] px-4 py-3 text-white shadow-[0_6px_18px_-8px_var(--lm-brand)]"
+                            : "rounded-2xl rounded-bl-md border border-border/70 bg-card/85 px-4 py-3.5 backdrop-blur-md sm:px-5",
                           m.streaming && m.content.length === 0 && "animate-pulse",
                         )}
                       >
@@ -618,7 +689,7 @@ export function AnimatedAiChat({
                       </div>
                     </div>
                     {m.role === "USER" && (
-                      <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted">
+                      <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-muted">
                         <User className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
                       </div>
                     )}
@@ -715,8 +786,8 @@ export function AnimatedAiChat({
       </div>
 
       {/* ── Composer ──────────────────────────────────────────────────────── */}
-      <div className="relative z-10 border-t border-border/70 p-3">
-        <div className="relative">
+      <div className="relative z-10 border-t border-border/70 p-3 sm:px-5">
+        <div className="relative mx-auto w-full max-w-[54rem]">
           <CommandPalette
             visible={paletteOpen}
             activeIndex={activeCmdIndex}
@@ -732,43 +803,52 @@ export function AnimatedAiChat({
               onKeyDown={handleKeyDown}
               placeholder="Ask about leads, scores, predictions, actions…  Type / for commands"
               rows={1}
+              maxLength={MAX_MESSAGE_LENGTH}
               aria-label="Message the copilot"
               className="max-h-[180px] min-h-[2.25rem] flex-1 resize-none border-0 bg-transparent px-2 py-1.5 text-sm shadow-none focus-visible:ring-0"
               disabled={sending}
             />
-            {sending ? (
-              <Button
-                variant="destructive"
-                size="icon"
-                className="h-9 w-9 shrink-0"
-                onClick={onStop}
-                aria-label="Stop generating"
-                title="Stop generating"
-              >
-                <X className="h-4 w-4" aria-hidden="true" />
-              </Button>
-            ) : (
-              <LiquidGlassButton
-                variant="brand"
-                size="icon"
-                className="h-9 w-9 shrink-0"
-                onClick={() => {
-                  if (!input.trim()) return;
-                  const text = expandSlashCommand(input.trim());
-                  setInput("");
-                  onSend(text);
-                }}
-                disabled={!input.trim()}
-                aria-label="Send message"
-                title="Send message (Enter)"
-              >
-                <Send className="h-4 w-4" aria-hidden="true" />
-              </LiquidGlassButton>
-            )}
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              {nearLimit && (
+                <span
+                  className={cn(
+                    "font-mono text-[9.5px] tabular-nums",
+                    input.length >= MAX_MESSAGE_LENGTH ? "text-rose-500" : "text-muted-foreground",
+                  )}
+                  aria-live="polite"
+                >
+                  {input.length}/{MAX_MESSAGE_LENGTH}
+                </span>
+              )}
+              {sending ? (
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  className="h-9 w-9"
+                  onClick={onStop}
+                  aria-label="Stop generating"
+                  title="Stop generating"
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </Button>
+              ) : (
+                <LiquidGlassButton
+                  variant="brand"
+                  size="icon"
+                  className="h-9 w-9"
+                  onClick={submitInput}
+                  disabled={!input.trim()}
+                  aria-label="Send message"
+                  title="Send message (Enter)"
+                >
+                  <Send className="h-4 w-4" aria-hidden="true" />
+                </LiquidGlassButton>
+              )}
+            </div>
           </div>
         </div>
 
-        <p className="mt-1.5 hidden items-center gap-3 px-1 text-[10px] text-muted-foreground sm:flex">
+        <p className="mx-auto mt-1.5 hidden max-w-[54rem] items-center gap-3 px-1 text-[10px] text-muted-foreground sm:flex">
           <span className="inline-flex items-center gap-1">
             <kbd className="rounded border bg-muted px-1 font-mono text-[9px]">/</kbd> commands
           </span>
@@ -787,5 +867,3 @@ export function AnimatedAiChat({
     </div>
   );
 }
-
-

@@ -408,10 +408,15 @@
   border: 1px solid var(--border);
   padding: 0.3rem 0.5rem;
   text-align: left;
+  /* Keep cells intact — long tables scroll horizontally instead of
+     breaking words mid-token (e.g. "ACTIV E", "SCHEDULE_D EMO"). */
+  overflow-wrap: normal;
+  word-break: normal;
 }
 .lm-prose th {
   background: var(--muted);
   font-weight: 600;
+  white-space: nowrap;
 }
 .lm-prose blockquote {
   border-left: 3px solid var(--lm-brand);
