@@ -9,11 +9,12 @@ The chatbot is **not** a decorative wrapper around an LLM: it plans, calls the s
 
 ---
 
-## Quick start (sandbox / local)
+## Quick start (local)
 
 ```bash
 bun install                 # install dependencies
-bun run db:push             # create/sync the SQLite database (db/custom.db)
+bun run db:generate
+bun run db:migrate          # create a development migration (requires PostgreSQL)
 bun run dev                 # start Next.js on http://localhost:3000
 ```
 
@@ -118,6 +119,12 @@ demo entry → dashboard renders live metrics → Lead Universe search/filter/so
 - No automated test suites (sandbox rule: no test code); quality gates used instead: strict `tsc`, ESLint, and the executed browser journey above.
 - Emails/external sales actions are intentionally never sent by the assistant.
 
-## Deployment notes
+## Vercel and Neon deployment
 
-- `bun run build` + `bun run start` for production (standalone output). Set `DATABASE_URL` (and switch `prisma/schema.prisma` provider to `postgresql` when moving off SQLite), run `bun run db:push` (or `prisma migrate` in CI), then boot. The LLM integration needs only the host platform’s SDK credentials; when absent the demo assistant keeps the product fully usable and clearly labelled.
+1. Copy `.env.example` to `.env` for local work. In Neon, use the pooled connection string for `DATABASE_URL` and the unpooled connection string for `DIRECT_URL`; keep both values private. Set both variables in Vercel for every environment that needs the app. No database URL is exposed to client bundles.
+2. Install and generate Prisma with `bun install --frozen-lockfile` and `bun run db:generate`. Vercel's build runs `prisma generate` before `next build`; build errors are not ignored.
+3. Apply checked-in database migrations with `bun run db:migrate:deploy` before routing traffic. Do not use schema-push/reset commands on production. If Neon already contains tables but has no Prisma migration history, inspect that schema first and baseline it only after confirming it matches the migration.
+4. To retain the existing SQLite data, first deploy the PostgreSQL schema, then preview the source with `bun scripts/migrate-sqlite-to-postgres.mjs --dry-run`. Run `bun run db:migrate:sqlite` only after confirming the Neon target. The transfer reads `db/custom.db` (or `SQLITE_DATA_PATH`) read-only, preflights ID collisions, copies every Prisma model in dependency order in one PostgreSQL transaction, and aborts rather than overwriting conflicting rows. Keep the SQLite file as your backup.
+5. In Vercel, use the standard Next.js build command (`bun run build`). The application uses the Vercel-compatible Next.js output; start the app with `bun run start` only for local production checks. Configure any optional AI provider credentials as server-only environment variables.
+
+The database migration and the one-time SQLite data transfer are separate operations. Do not run the transfer until the PostgreSQL schema exists, and do not delete the original SQLite file after deployment.

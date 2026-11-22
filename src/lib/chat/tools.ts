@@ -143,8 +143,8 @@ async function resolveLead(ctx: ToolContext, leadId?: string, leadName?: string)
       where: {
         workspaceId: ctx.workspaceId,
         OR: [
-          { contactName: { contains: leadName } },
-          { company: { is: { name: { contains: leadName } } } },
+          { contactName: { contains: leadName, mode: 'insensitive' } },
+          { company: { is: { name: { contains: leadName, mode: 'insensitive' } } } },
         ],
       },
       include: { company: true },

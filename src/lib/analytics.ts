@@ -91,9 +91,9 @@ export async function getLeadRows(
   if (filters.status) where.status = filters.status
   if (filters.query) {
     where.OR = [
-      { contactName: { contains: filters.query } },
-      { email: { contains: filters.query } },
-      { company: { is: { name: { contains: filters.query } } } },
+      { contactName: { contains: filters.query, mode: 'insensitive' } },
+      { email: { contains: filters.query, mode: 'insensitive' } },
+      { company: { is: { name: { contains: filters.query, mode: 'insensitive' } } } },
     ]
   }
   const leads = await db.lead.findMany({

@@ -130,7 +130,10 @@ export async function executePendingAction(
       const lead = await db.lead.findFirst({
         where: {
           workspaceId: ctx.workspaceId,
-          OR: [{ contactName: { contains: args.leadName } }, { company: { is: { name: { contains: args.leadName } } } }],
+          OR: [
+            { contactName: { contains: args.leadName, mode: 'insensitive' } },
+            { company: { is: { name: { contains: args.leadName, mode: 'insensitive' } } } },
+          ],
         },
       })
       leadId = lead?.id ?? null

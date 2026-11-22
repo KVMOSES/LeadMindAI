@@ -1,13 +1,14 @@
 // LeadMind AI — Prisma schema
-// SQLite for local/sandbox development (PostgreSQL-compatible field choices)
+// PostgreSQL for local and production deployments.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ─────────────────────────── Identity & tenancy ───────────────────────────
